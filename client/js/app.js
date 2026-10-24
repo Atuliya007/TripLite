@@ -35,6 +35,7 @@ function saveData(key, data) {
 let trips = loadData(STORAGE_KEYS.trips);
 let packingItems = loadData(STORAGE_KEYS.packing);
 let expenses = loadData(STORAGE_KEYS.expenses);
+let expenseFilter = "all";
 let toastTimer;
 
 /* ==========================================
@@ -223,9 +224,52 @@ $("#view-all-trips")?.addEventListener("click", () => {
 
 const tripDialog = $("#trip-dialog");
 const tripForm = $("#trip-form");
+let editingTripId = null;
+
+function setTripDialogMode(isEditing) {
+  const heading = $(".dialog-heading h2");
+  const submitButton = tripForm?.querySelector('button[type="submit"]');
+
+  if (heading) {
+    heading.textContent = isEditing ? "Edit your trip" : "Create your trip";
+  }
+  if (submitButton) {
+    submitButton.textContent = isEditing ? "Save changes" : "Save trip";
+  }
+}
 
 function openTripDialog() {
   if (!tripDialog) return;
+
+  editingTripId = null;
+  tripForm?.reset();
+  if (tripForm) {
+    tripForm.elements.namedItem("travellers").value = "1";
+    tripForm.elements.namedItem("budget").value = "10000";
+  }
+  setTripDialogMode(false);
+
+  const error = $("#form-error");
+  if (error) error.textContent = "";
+
+  if (typeof tripDialog.showModal === "function") {
+    tripDialog.showModal();
+  } else {
+    tripDialog.setAttribute("open", "");
+  }
+}
+
+function openEditTripDialog(trip) {
+  if (!tripDialog || !tripForm) return;
+
+  editingTripId = trip.id;
+  tripForm.elements.namedItem("name").value = trip.name;
+  tripForm.elements.namedItem("destination").value = trip.destination;
+  tripForm.elements.namedItem("startDate").value = trip.startDate;
+  tripForm.elements.namedItem("endDate").value = trip.endDate;
+  tripForm.elements.namedItem("travellers").value = String(trip.travellers);
+  tripForm.elements.namedItem("budget").value = String(trip.budget);
+  setTripDialogMode(true);
 
   const error = $("#form-error");
   if (error) error.textContent = "";
@@ -256,7 +300,7 @@ tripDialog?.addEventListener("click", event => {
 });
 
 /* ==========================================
-   CREATE TRIP — SAVE TO MONGODB
+   CREATE AND EDIT TRIPS — MONGODB
 ========================================== */
 
 tripForm?.addEventListener("submit", async event => {
@@ -270,6 +314,7 @@ tripForm?.addEventListener("submit", async event => {
   const endDate = String(data.get("endDate") || "");
   const travellers = Number(data.get("travellers"));
   const budget = Number(data.get("budget"));
+  const tripId = editingTripId;
 
   const error = $("#form-error");
   if (error) error.textContent = "";
@@ -288,9 +333,9 @@ tripForm?.addEventListener("submit", async event => {
     return;
   }
 
-  if (!Number.isInteger(travellers) || travellers < 1) {
+  if (!Number.isInteger(travellers) || travellers < 1 || travellers > 50) {
     if (error) {
-      error.textContent = "Enter a valid number of travellers.";
+      error.textContent = "Enter between 1 and 50 travellers.";
     }
     return;
   }
@@ -309,23 +354,30 @@ tripForm?.addEventListener("submit", async event => {
   if (submitButton) submitButton.disabled = true;
 
   try {
-    const result = await apiRequest("/api/trips", {
-      method: "POST",
-      body: JSON.stringify({
-        name,
-        destination,
-        startDate,
-        endDate,
-        travellers,
-        budget
-      })
-    });
+    const result = await apiRequest(
+      tripId
+        ? `/api/trips/${encodeURIComponent(tripId)}`
+        : "/api/trips",
+      {
+        method: tripId ? "PUT" : "POST",
+        body: JSON.stringify({
+          name,
+          destination,
+          startDate,
+          endDate,
+          travellers,
+          budget
+        })
+      }
+    );
 
-    const newTrip = normalizeTrip(result.data);
-
-    trips.unshift(newTrip);
-    saveData(STORAGE_KEYS.trips, trips);
-
+    const savedTrip = normalizeTrip(result.data);
+    if (tripId) {
+      const index = trips.findIndex(trip => trip.id === tripId);
+      if (index !== -1) trips[index] = savedTrip;
+    } else {
+      trips.unshift(savedTrip);
+    }
     tripForm.reset();
 
     tripForm.elements.namedItem("travellers").value = "1";
@@ -337,21 +389,23 @@ tripForm?.addEventListener("submit", async event => {
     renderAllTrips();
     updateExpenseTripOptions();
 
-    showView("dashboard");
-    showToast("Trip saved to MongoDB!");
-  } catch (error) {
-    console.error("Create trip failed:", error);
-
-    if (error) {
-      error.textContent =
-        error.message || "Could not save trip. Please try again.";
+    if (tripId) {
+      renderExpenses();
+      showToast("Trip updated successfully!");
+    } else {
+      showView("dashboard");
+      showToast("Trip saved to MongoDB!");
     }
-
-    // The variable above shadows the form error element.
+  } catch (error) {
+    console.error(
+      tripId ? "Update trip failed:" : "Create trip failed:",
+      error
+    );
     const formError = $("#form-error");
     if (formError) {
       formError.textContent =
-        error.message || "Could not save trip. Please try again.";
+        error.message ||
+        `Could not ${tripId ? "update" : "save"} trip. Please try again.`;
     }
   } finally {
     if (submitButton) submitButton.disabled = false;
@@ -364,8 +418,12 @@ tripForm?.addEventListener("submit", async event => {
 
 function tripCardHTML(trip) {
   const spent = expenses
-    .filter(expense => expense.tripId === trip.id)
-    .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+    .filter(expense => getExpenseTripId(expense) === trip.id)
+    .reduce((sum, expense) => sum + expenseAmount(expense), 0);
+  const remainingBudget = Number(trip.budget) - spent;
+  const budgetStatus = remainingBudget < 0
+    ? `Over budget by ${money(Math.abs(remainingBudget))}`
+    : `Remaining: ${money(remainingBudget)}`;
 
   return `
     <article class="trip-card">
@@ -387,12 +445,22 @@ function tripCardHTML(trip) {
           <span>Budget: <strong>${money(trip.budget)}</strong></span>
           <span>Spent: <strong>${money(spent)}</strong></span>
         </div>
+        <p class="trip-budget-status${remainingBudget < 0 ? " is-over-budget" : ""}">
+          ${escapeHTML(budgetStatus)}
+        </p>
 
-        <button
-          type="button"
-          class="text-btn delete-trip-btn"
-          data-trip-id="${escapeHTML(trip.id)}"
-        >Delete trip</button>
+        <div class="trip-card-actions">
+          <button
+            type="button"
+            class="text-btn edit-trip-btn"
+            data-trip-id="${escapeHTML(trip.id)}"
+          >Edit</button>
+          <button
+            type="button"
+            class="text-btn delete-trip-btn"
+            data-trip-id="${escapeHTML(trip.id)}"
+          >Delete trip</button>
+        </div>
       </div>
     </article>
   `;
@@ -436,6 +504,13 @@ function renderRecentTrips() {
 ========================================== */
 
 document.addEventListener("click", async event => {
+  const editButton = event.target.closest(".edit-trip-btn");
+  if (editButton) {
+    const trip = trips.find(item => item.id === editButton.dataset.tripId);
+    if (trip) openEditTripDialog(trip);
+    return;
+  }
+
   const button = event.target.closest(".delete-trip-btn");
   if (!button) return;
 
@@ -463,7 +538,6 @@ document.addEventListener("click", async event => {
         : expense
     );
 
-    saveData(STORAGE_KEYS.trips, trips);
     saveData(STORAGE_KEYS.expenses, expenses);
 
     renderDashboard();
@@ -608,7 +682,7 @@ function updateExpenseTripOptions() {
   const previousValue = select.value;
 
   select.innerHTML = `
-    <option value="">General expense</option>
+    <option value="">Unassigned expense</option>
     ${trips.map(trip => `
       <option value="${escapeHTML(trip.id)}">
         ${escapeHTML(trip.name)} — ${escapeHTML(trip.destination)}
@@ -618,7 +692,43 @@ function updateExpenseTripOptions() {
 
   if (trips.some(trip => trip.id === previousValue)) {
     select.value = previousValue;
+  } else {
+    select.value = "";
   }
+}
+
+function updateExpenseFilterOptions() {
+  const select = $("#expense-filter");
+  if (!select) return;
+
+  const previousValue = expenseFilter;
+  select.innerHTML = `
+    <option value="all">All expenses</option>
+    <option value="unassigned">Unassigned expenses</option>
+    ${trips.map(trip => `
+      <option value="${escapeHTML(trip.id)}">
+        ${escapeHTML(trip.name)} â€” ${escapeHTML(trip.destination)}
+      </option>
+    `).join("")}
+  `;
+
+  expenseFilter = previousValue === "all" || previousValue === "unassigned" ||
+    trips.some(trip => trip.id === previousValue)
+    ? previousValue
+    : "all";
+  select.value = expenseFilter;
+}
+
+function getExpenseTripId(expense) {
+  return typeof expense?.tripId === "string" &&
+    trips.some(trip => trip.id === expense.tripId)
+    ? expense.tripId
+    : "";
+}
+
+function expenseAmount(expense) {
+  const amount = Number(expense?.amount);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
 }
 
 expenseForm?.addEventListener("submit", event => {
@@ -638,6 +748,12 @@ expenseForm?.addEventListener("submit", event => {
 
   if (!Number.isFinite(amount) || amount <= 0) {
     showToast("Valid expense amount enter karo.");
+    return;
+  }
+
+  if (tripId && !trips.some(trip => trip.id === tripId)) {
+    showToast("That trip is no longer available. Choose another trip.");
+    updateExpenseTripOptions();
     return;
   }
 
@@ -662,53 +778,86 @@ expenseForm?.addEventListener("submit", event => {
 });
 
 function renderExpenses() {
+  updateExpenseFilterOptions();
+
   const list = $("#expenses-list");
   const empty = $("#expenses-empty");
 
-  const total = expenses.reduce(
-    (sum, expense) => sum + Number(expense.amount || 0),
+  const globalTotal = expenses.reduce(
+    (sum, expense) => sum + expenseAmount(expense),
+    0
+  );
+  const globalSummary = $("#expense-global-summary");
+  if (globalSummary) {
+    globalSummary.textContent =
+      `All expenses: ${money(globalTotal)} across ${expenses.length} ` +
+      `${expenses.length === 1 ? "transaction" : "transactions"}.`;
+  }
+
+  const visibleExpenses = expenses.filter(expense => {
+    if (expenseFilter === "all") return true;
+    const tripId = getExpenseTripId(expense);
+    if (expenseFilter === "unassigned") return !tripId;
+    return tripId === expenseFilter;
+  });
+  const filteredTotal = visibleExpenses.reduce(
+    (sum, expense) => sum + expenseAmount(expense),
     0
   );
 
   const totalElement = $("#expense-total");
   const countElement = $("#expense-count");
 
-  if (totalElement) totalElement.textContent = money(total);
-  if (countElement) countElement.textContent = String(expenses.length);
+  if (totalElement) totalElement.textContent = money(filteredTotal);
+  if (countElement) countElement.textContent = String(visibleExpenses.length);
 
   if (!list) return;
 
-  if (empty) empty.hidden = expenses.length > 0;
+  if (empty) {
+    empty.hidden = visibleExpenses.length > 0;
+    empty.textContent = expenses.length
+      ? "No expenses match this filter."
+      : "No expenses recorded yet.";
+  }
 
-  list.innerHTML = expenses.map(expense => {
-    const trip = trips.find(item => item.id === expense.tripId);
+  list.innerHTML = visibleExpenses.map(expense => {
+    const tripId = getExpenseTripId(expense);
+    const trip = trips.find(item => item.id === tripId);
+    const expenseId = String(expense?.id ?? "");
 
     return `
       <article class="expense-row">
         <div class="expense-details">
-          <strong>${escapeHTML(expense.description)}</strong>
+          <strong>${escapeHTML(expense?.description || "Untitled expense")}</strong>
           <p class="muted">
-            ${escapeHTML(expense.category)}
-            · ${escapeHTML(formatDate(expense.date?.slice(0, 10)))}
+            ${escapeHTML(expense?.category || "Other")}
+            · ${escapeHTML(formatDate(String(expense?.date || "").slice(0, 10)))}
           </p>
           <small class="muted">
             ${trip
               ? `Trip: ${escapeHTML(trip.name)}`
-              : "General expense"}
+              : "Unassigned expense"}
           </small>
         </div>
 
-        <strong class="expense-amount">${money(expense.amount)}</strong>
+        <strong class="expense-amount">${money(expenseAmount(expense))}</strong>
 
-        <button
-          type="button"
-          class="text-btn delete-expense-btn"
-          data-expense-id="${escapeHTML(expense.id)}"
-        >Delete</button>
+        ${expenseId ? `
+          <button
+            type="button"
+            class="text-btn delete-expense-btn"
+            data-expense-id="${escapeHTML(expenseId)}"
+          >Delete</button>
+        ` : ""}
       </article>
     `;
   }).join("");
 }
+
+$("#expense-filter")?.addEventListener("change", event => {
+  expenseFilter = event.target.value;
+  renderExpenses();
+});
 
 $("#expenses-list")?.addEventListener("click", event => {
   const button = event.target.closest(".delete-expense-btn");
@@ -737,7 +886,7 @@ function renderDashboard() {
   );
 
   const totalSpent = expenses.reduce(
-    (sum, expense) => sum + Number(expense.amount || 0),
+    (sum, expense) => sum + expenseAmount(expense),
     0
   );
 
@@ -793,7 +942,6 @@ async function initializeApp() {
     const result = await apiRequest("/api/trips");
 
     trips = result.data.map(normalizeTrip);
-    saveData(STORAGE_KEYS.trips, trips);
 
     renderDashboard();
     renderAllTrips();

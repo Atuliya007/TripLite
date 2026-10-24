@@ -270,16 +270,19 @@
         <section class="stats-grid">
 
           <article class="stat-card">
-            <p>Total spent</p>
+            <p>Filtered total</p>
             <h2 id="expense-total">₹0</h2>
           </article>
 
           <article class="stat-card">
-            <p>Total transactions</p>
+            <p>Filtered transactions</p>
             <h2 id="expense-count">0</h2>
           </article>
 
         </section>
+        <p id="expense-global-summary" class="muted expense-global-summary">
+          All expenses across all trips.
+        </p>
 
         <!-- ADD EXPENSE FORM -->
         <form id="expense-form" class="expense-form">
@@ -319,7 +322,12 @@
             </select>
           </label>
 
-          
+          <label>
+            Related trip
+            <select id="expense-trip" name="tripId">
+              <option value="">Unassigned expense</option>
+            </select>
+          </label>
 
           <button type="submit" class="primary-btn">
             + Add expense
@@ -334,6 +342,13 @@
               <h2>Expense history</h2>
               <p class="muted">Your recorded travel costs.</p>
             </div>
+            <label class="expense-filter-label" for="expense-filter">
+              Show
+              <select id="expense-filter">
+                <option value="all">All expenses</option>
+                <option value="unassigned">Unassigned expenses</option>
+              </select>
+            </label>
           </div>
 
           <div id="expenses-list"></div>

@@ -498,7 +498,10 @@ h1 {
 .trip-card h3 { margin: 7px 0 4px; overflow-wrap: anywhere; }
 .trip-destination { color: #9b7b47; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .trip-card-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin: 18px 0 12px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; }
-.trip-card .delete-trip-btn { padding: 6px 0; }
+.trip-budget-status { margin: -5px 0 14px; color: var(--primary); font-size: 12px; font-weight: 700; }
+.trip-budget-status.is-over-budget { color: #a34b3e; }
+.trip-card-actions { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.trip-card-actions .text-btn { padding: 6px 0; }
 
 .empty-state {
     grid-column: 1 / -1;
@@ -720,6 +723,19 @@ footer {
 ======================================== */
 
 #expenses-list { display: grid; gap: 10px; }
+.expense-global-summary { margin: -23px 0 22px; }
+.expense-filter-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; }
+#expenses-section .section-heading { flex-wrap: wrap; }
+#expense-filter {
+    min-width: 180px;
+    max-width: 100%;
+    padding: 9px 30px 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+}
 
 .expense-row {
     display: flex;
@@ -978,4 +994,7 @@ footer {
 
     .expense-details { flex-basis: 100%; }
     .expense-amount { margin-right: auto; }
+
+    .expense-filter-label { align-items: flex-start; flex-direction: column; }
+    #expense-filter { width: 100%; min-width: 0; }
 }

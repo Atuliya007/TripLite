@@ -12,6 +12,25 @@ const PORT = process.env.PORT || 3000;
 const MONGODB_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/triplite";
 
+function parseDateOnly(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "client")));
 
@@ -48,12 +67,21 @@ app.get("/api/trips", async (req, res) => {
 // POST: Create a trip
 app.post("/api/trips", async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide trip details as a JSON object",
+      });
+    }
+
     const { name, destination, startDate, endDate, travellers, budget } =
       req.body;
 
     if (
-      !name?.trim() ||
-      !destination?.trim() ||
+      typeof name !== "string" ||
+      !name.trim() ||
+      typeof destination !== "string" ||
+      !destination.trim() ||
       !startDate ||
       !endDate ||
       travellers === undefined ||
@@ -68,11 +96,12 @@ app.post("/api/trips", async (req, res) => {
     if (
       !Number.isFinite(Number(travellers)) ||
       Number(travellers) < 1 ||
+      Number(travellers) > 50 ||
       !Number.isInteger(Number(travellers))
     ) {
       return res.status(400).json({
         success: false,
-        message: "Travellers must be a positive whole number",
+        message: "Travellers must be a whole number between 1 and 50",
       });
     }
 
@@ -83,14 +112,10 @@ app.post("/api/trips", async (req, res) => {
       });
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const start = parseDateOnly(startDate);
+    const end = parseDateOnly(endDate);
 
-    if (
-      Number.isNaN(start.getTime()) ||
-      Number.isNaN(end.getTime()) ||
-      end < start
-    ) {
+    if (!start || !end || end < start) {
       return res.status(400).json({
         success: false,
         message: "Please provide valid trip dates",
@@ -129,6 +154,13 @@ app.post("/api/trips", async (req, res) => {
 // PUT: Update a trip
 app.put("/api/trips/:id", async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide trip updates as a JSON object",
+      });
+    }
+
     const allowedFields = [
       "name",
       "destination",
@@ -170,17 +202,17 @@ app.put("/api/trips/:id", async (req, res) => {
     }
 
     if (updates.startDate !== undefined) {
-      updates.startDate = new Date(updates.startDate);
+      updates.startDate = parseDateOnly(updates.startDate);
     }
 
     if (updates.endDate !== undefined) {
-      updates.endDate = new Date(updates.endDate);
+      updates.endDate = parseDateOnly(updates.endDate);
     }
 
     for (const field of ["startDate", "endDate"]) {
       if (
         updates[field] !== undefined &&
-        Number.isNaN(updates[field].getTime())
+        !updates[field]
       ) {
         return res.status(400).json({
           success: false,
@@ -196,7 +228,7 @@ app.put("/api/trips/:id", async (req, res) => {
         if (
           !Number.isFinite(value) ||
           (field === "travellers" &&
-            (!Number.isInteger(value) || value < 1)) ||
+            (!Number.isInteger(value) || value < 1 || value > 50)) ||
           (field === "budget" && value < 0)
         ) {
           return res.status(400).json({

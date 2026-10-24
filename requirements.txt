@@ -1,0 +1,2 @@
+# Python dependencies are not required to run TripLite.
+# Node.js dependencies are managed through package.json.
