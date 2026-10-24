@@ -1,4 +1,9 @@
+
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/* ========================================
+   TRIPLITE — DESIGN SYSTEM
+======================================== */
 
 :root {
     --primary: #25483f;
@@ -20,6 +25,10 @@
     padding: 0;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 body {
     font-family: 'DM Sans', sans-serif;
     background: var(--bg);
@@ -28,7 +37,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
     font: inherit;
 }
 
@@ -36,9 +47,20 @@ button {
     cursor: pointer;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 .app-shell {
     min-height: 100vh;
 }
+
+/* ========================================
+   SIDEBAR
+======================================== */
 
 .sidebar {
     position: fixed;
@@ -110,6 +132,7 @@ button {
 .avatar {
     width: 40px;
     height: 40px;
+    flex-shrink: 0;
     border-radius: 50%;
     background: #e0c18a;
     color: #19352e;
@@ -129,8 +152,13 @@ button {
     font-size: 11px;
 }
 
+/* ========================================
+   MAIN CONTENT AND TOPBAR
+======================================== */
+
 .main-content {
     max-width: 1600px;
+    min-width: 0;
     margin-left: 245px;
     padding: 35px 42px;
 }
@@ -165,6 +193,10 @@ h1 {
     margin-top: 7px;
 }
 
+/* ========================================
+   BUTTONS
+======================================== */
+
 .primary-btn {
     border: 1px solid var(--primary);
     background: var(--primary);
@@ -183,14 +215,24 @@ h1 {
     transform: translateY(-2px);
 }
 
+/* ========================================
+   WELCOME BANNER
+======================================== */
+
 .welcome-banner {
     min-height: 230px;
     border-radius: 22px;
     padding: 34px 36px;
     color: #fffdf7;
     background:
-        linear-gradient(105deg, rgba(19, 45, 37, 0.97), rgba(37, 72, 63, 0.91) 58%, rgba(91, 108, 83, 0.73)),
-        url('https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=85') center 52% / cover;
+        linear-gradient(
+            105deg,
+            rgba(19, 45, 37, 0.97),
+            rgba(37, 72, 63, 0.91) 58%,
+            rgba(91, 108, 83, 0.73)
+        ),
+        url('https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=85')
+        center 52% / cover;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -243,6 +285,10 @@ h1 {
     transform: rotate(-18deg);
     padding-right: 35px;
 }
+
+/* ========================================
+   DASHBOARD STATISTICS
+======================================== */
 
 .stats-grid {
     display: grid;
@@ -329,6 +375,10 @@ h1 {
     transition: width 0.3s;
 }
 
+/* ========================================
+   SECTIONS
+======================================== */
+
 .section-block {
     margin-bottom: 36px;
 }
@@ -357,6 +407,10 @@ h1 {
 .text-btn:hover {
     color: #9b7138;
 }
+
+/* ========================================
+   DESTINATION CARDS
+======================================== */
 
 .destination-grid {
     display: grid;
@@ -388,7 +442,10 @@ h1 {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(transparent 20%, rgba(12, 28, 23, 0.85));
+    background: linear-gradient(
+        transparent 20%,
+        rgba(12, 28, 23, 0.85)
+    );
     pointer-events: none;
 }
 
@@ -416,6 +473,10 @@ h1 {
     font-size: 12px;
     opacity: 0.9;
 }
+
+/* ========================================
+   TRIPS GRID AND EMPTY STATE
+======================================== */
 
 .trips-grid {
     display: grid;
@@ -445,6 +506,10 @@ h1 {
     font-size: 13px;
     color: var(--muted);
 }
+
+/* ========================================
+   CREATE TRIP DIALOG
+======================================== */
 
 .trip-dialog {
     width: min(500px, calc(100% - 28px));
@@ -526,6 +591,10 @@ h1 {
     width: 100%;
 }
 
+/* ========================================
+   TOAST AND FOOTER
+======================================== */
+
 .toast {
     position: fixed;
     right: 24px;
@@ -556,6 +625,163 @@ footer {
     padding: 15px 0;
 }
 
+/* ========================================
+   PACKING CHECKLIST
+======================================== */
+
+.packing-form {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.packing-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font: inherit;
+}
+
+.packing-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+}
+
+.packing-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.packing-list label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-wrap: anywhere;
+}
+
+.packing-list input[type="checkbox"] {
+    accent-color: var(--primary);
+}
+
+.packing-list .packed {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.packing-list button {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+    background: transparent;
+}
+
+#packing-progress-bar {
+    display: block;
+    height: 8px;
+    border-radius: 8px;
+    background: var(--accent);
+    transition: width 0.25s ease;
+}
+
+/* ========================================
+   EXPENSE FORM — CLEAN LAYOUT
+======================================== */
+
+#expense-form {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 18px 24px;
+    width: 100%;
+}
+
+/* Labels and fields stay together */
+#expense-form label {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+}
+
+/* Expense description */
+#expense-form input[name="description"] {
+    width: 215px;
+    height: 38px;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid #888;
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+}
+
+/* Amount */
+#expense-form input[name="amount"] {
+    width: 215px;
+    height: 38px;
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid #888;
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+}
+
+/* Category dropdown */
+#expense-form select[name="category"] {
+    width: 150px;
+    height: 38px;
+    min-height: 38px;
+    padding: 5px 8px;
+    border: 1px solid #888;
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+/* Related trip dropdown */
+#expense-form select[name="tripId"] {
+    width: 170px;
+    height: 38px;
+    min-height: 38px;
+    padding: 5px 8px;
+    border: 1px solid #888;
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+/* Add expense button */
+#expense-form button {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    min-height: 38px;
+    margin: 0;
+}
+
+/* ========================================
+   RESPONSIVE — TABLET
+======================================== */
+
 @media (max-width: 1100px) {
     .main-content {
         padding: 28px 24px;
@@ -568,7 +794,16 @@ footer {
     .destination-card {
         height: 200px;
     }
+
+    #expense-form {
+        column-gap: 20px;
+        row-gap: 18px;
+    }
 }
+
+/* ========================================
+   RESPONSIVE — MOBILE
+======================================== */
 
 @media (max-width: 720px) {
     .sidebar {
@@ -634,75 +869,43 @@ footer {
     }
 }
 
-/* Packing checklist */
-.packing-form {
-    display: flex;
-    gap: 12px;
-    margin: 20px 0;
-}
-
-.packing-form input {
-    flex: 1;
-    min-width: 0;
-    padding: 12px 14px;
-    border: 1px solid var(--border, #e7e3d9);
-    border-radius: 10px;
-    font: inherit;
-}
-
-.packing-list {
-    list-style: none;
-    padding: 0;
-    margin: 16px 0;
-}
-
-.packing-list li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--border, #e7e3d9);
-}
-
-.packing-list label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    overflow-wrap: anywhere;
-}
-
-.packing-list input[type="checkbox"] {
-    accent-color: var(--primary, #25483f);
-}
-
-.packing-list .packed {
-    text-decoration: line-through;
-    opacity: 0.6;
-}
-
-.packing-list button {
-    border: 1px solid var(--border, #e7e3d9);
-    border-radius: 8px;
-    padding: 7px 10px;
-    cursor: pointer;
-    background: transparent;
-}
-
-#packing-progress-bar {
-    display: block;
-    height: 8px;
-    border-radius: 8px;
-    background: var(--accent, #b9955b);
-    transition: width 0.25s ease;
-}
-
-[hidden] {
-    display: none !important;
-}
-
+/* Small screens */
 @media (max-width: 520px) {
     .packing-form {
         flex-direction: column;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .trip-dialog {
+        padding: 20px;
+    }
+
+    #expense-form {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    #expense-form label {
+        width: 100%;
+    }
+
+    #expense-form input[name="description"],
+    #expense-form input[name="amount"],
+    #expense-form select[name="category"],
+    #expense-form select[name="tripId"] {
+        width: 100%;
+        max-width: 100%;
+        height: 42px;
+        min-height: 42px;
+    }
+
+    #expense-form button {
+        width: 100%;
+        min-height: 44px;
+        align-self: stretch;
     }
 }

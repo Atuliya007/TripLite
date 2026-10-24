@@ -1,10 +1,10 @@
 
 "use strict";
 
-/* =========================================
-   TripLite — Complete Frontend JavaScript
-   Storage: Browser LocalStorage
-========================================= */
+/* ==========================================
+   TRIPLITE — COMPLETE APP.JS
+   Storage: LocalStorage
+========================================== */
 
 const $ = (selector, parent = document) =>
   parent.querySelector(selector);
@@ -34,12 +34,11 @@ function saveData(key, data) {
 let trips = loadData(STORAGE_KEYS.trips);
 let packingItems = loadData(STORAGE_KEYS.packing);
 let expenses = loadData(STORAGE_KEYS.expenses);
-
 let toastTimer;
 
-/* =========================================
+/* ==========================================
    HELPERS
-========================================= */
+========================================== */
 
 function createId() {
   return globalThis.crypto?.randomUUID?.()
@@ -47,13 +46,13 @@ function createId() {
 }
 
 function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, character => ({
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#39;"
-  })[character]);
+  })[char]);
 }
 
 function money(amount) {
@@ -92,21 +91,9 @@ function showToast(message) {
   }, 2600);
 }
 
-function persistTrips() {
-  saveData(STORAGE_KEYS.trips, trips);
-}
-
-function persistPacking() {
-  saveData(STORAGE_KEYS.packing, packingItems);
-}
-
-function persistExpenses() {
-  saveData(STORAGE_KEYS.expenses, expenses);
-}
-
-/* =========================================
+/* ==========================================
    NAVIGATION
-========================================= */
+========================================== */
 
 const views = {
   dashboard: $("#dashboard-view"),
@@ -123,7 +110,9 @@ const pageTitles = {
 };
 
 function showView(viewName) {
-  if (!views[viewName]) viewName = "dashboard";
+  if (!views[viewName]) {
+    viewName = "dashboard";
+  }
 
   Object.entries(views).forEach(([name, element]) => {
     if (element) {
@@ -132,11 +121,11 @@ function showView(viewName) {
   });
 
   $$(".nav-link").forEach(button => {
-    const isActive = button.dataset.view === viewName;
+    const active = button.dataset.view === viewName;
 
-    button.classList.toggle("active", isActive);
+    button.classList.toggle("active", active);
 
-    if (isActive) {
+    if (active) {
       button.setAttribute("aria-current", "page");
     } else {
       button.removeAttribute("aria-current");
@@ -144,7 +133,18 @@ function showView(viewName) {
   });
 
   const title = $("#page-title");
-  if (title) title.textContent = pageTitles[viewName];
+  if (title) {
+    title.textContent = pageTitles[viewName];
+  }
+
+  // CREATE TRIP BUTTON VISIBILITY
+  const createTripButton = $("#add-trip-btn");
+
+  if (createTripButton) {
+    createTripButton.hidden =
+      viewName === "checklist" ||
+      viewName === "expenses";
+  }
 
   if (viewName === "dashboard") renderDashboard();
   if (viewName === "trips") renderAllTrips();
@@ -165,9 +165,9 @@ $("#view-all-trips")?.addEventListener("click", () => {
   showView("trips");
 });
 
-/* =========================================
+/* ==========================================
    CREATE TRIP DIALOG
-========================================= */
+========================================== */
 
 const tripDialog = $("#trip-dialog");
 const tripForm = $("#trip-form");
@@ -205,18 +205,14 @@ tripDialog?.addEventListener("click", event => {
 tripForm?.addEventListener("submit", event => {
   event.preventDefault();
 
-  const formData = new FormData(tripForm);
+  const data = new FormData(tripForm);
 
-  const name = String(formData.get("name") || "").trim();
-  const destination = String(
-    formData.get("destination") || ""
-  ).trim();
-
-  const startDate = String(formData.get("startDate") || "");
-  const endDate = String(formData.get("endDate") || "");
-
-  const travellers = Number(formData.get("travellers"));
-  const budget = Number(formData.get("budget"));
+  const name = String(data.get("name") || "").trim();
+  const destination = String(data.get("destination") || "").trim();
+  const startDate = String(data.get("startDate") || "");
+  const endDate = String(data.get("endDate") || "");
+  const travellers = Number(data.get("travellers"));
+  const budget = Number(data.get("budget"));
 
   const error = $("#form-error");
 
@@ -240,7 +236,7 @@ tripForm?.addEventListener("submit", event => {
     return;
   }
 
-  const trip = {
+  trips.unshift({
     id: createId(),
     name,
     destination,
@@ -249,18 +245,14 @@ tripForm?.addEventListener("submit", event => {
     travellers,
     budget,
     createdAt: new Date().toISOString()
-  };
+  });
 
-  trips.unshift(trip);
-  persistTrips();
+  saveData(STORAGE_KEYS.trips, trips);
 
   tripForm.reset();
 
-  const travellersInput = tripForm.elements.namedItem("travellers");
-  const budgetInput = tripForm.elements.namedItem("budget");
-
-  if (travellersInput) travellersInput.value = "1";
-  if (budgetInput) budgetInput.value = "10000";
+  tripForm.elements.namedItem("travellers").value = "1";
+  tripForm.elements.namedItem("budget").value = "10000";
 
   closeTripDialog();
 
@@ -272,12 +264,12 @@ tripForm?.addEventListener("submit", event => {
   showToast("Trip created successfully!");
 });
 
-/* =========================================
+/* ==========================================
    TRIP CARDS
-========================================= */
+========================================== */
 
 function tripCardHTML(trip) {
-  const relatedExpenses = expenses
+  const spent = expenses
     .filter(expense => expense.tripId === trip.id)
     .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
 
@@ -298,43 +290,35 @@ function tripCardHTML(trip) {
         <p>${escapeHTML(trip.travellers)} traveller(s)</p>
 
         <div class="trip-card-footer">
-          <span>
-            Budget: <strong>${money(trip.budget)}</strong>
-          </span>
-          <span>
-            Spent: <strong>${money(relatedExpenses)}</strong>
-          </span>
+          <span>Budget: <strong>${money(trip.budget)}</strong></span>
+          <span>Spent: <strong>${money(spent)}</strong></span>
         </div>
 
         <button
           type="button"
           class="text-btn delete-trip-btn"
           data-trip-id="${escapeHTML(trip.id)}"
-        >
-          Delete trip
-        </button>
+        >Delete trip</button>
       </div>
     </article>
   `;
 }
 
-function renderTripContainer(container, tripList, emptyMessage) {
+function renderTripContainer(container, items, message) {
   if (!container) return;
 
-  if (tripList.length === 0) {
+  if (!items.length) {
     container.innerHTML = `
       <div class="empty-state">
         <span>🧳</span>
         <h3>No trips yet</h3>
-        <p>${escapeHTML(emptyMessage)}</p>
+        <p>${escapeHTML(message)}</p>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = tripList
-    .map(tripCardHTML)
-    .join("");
+  container.innerHTML = items.map(tripCardHTML).join("");
 }
 
 function renderAllTrips() {
@@ -354,19 +338,15 @@ function renderRecentTrips() {
 }
 
 document.addEventListener("click", event => {
-  const deleteButton = event.target.closest(".delete-trip-btn");
-  if (!deleteButton) return;
+  const button = event.target.closest(".delete-trip-btn");
+  if (!button) return;
 
-  const tripId = deleteButton.dataset.tripId;
-
+  const tripId = button.dataset.tripId;
   const trip = trips.find(item => item.id === tripId);
+
   if (!trip) return;
 
-  const confirmed = window.confirm(
-    `Delete "${trip.name}"? Expenses linked to this trip will become general expenses.`
-  );
-
-  if (!confirmed) return;
+  if (!confirm(`Delete "${trip.name}"?`)) return;
 
   trips = trips.filter(item => item.id !== tripId);
 
@@ -376,8 +356,8 @@ document.addEventListener("click", event => {
       : expense
   );
 
-  persistTrips();
-  persistExpenses();
+  saveData(STORAGE_KEYS.trips, trips);
+  saveData(STORAGE_KEYS.expenses, expenses);
 
   renderDashboard();
   renderAllTrips();
@@ -387,19 +367,16 @@ document.addEventListener("click", event => {
   showToast("Trip deleted.");
 });
 
-/* =========================================
+/* ==========================================
    PACKING CHECKLIST
-========================================= */
+========================================== */
 
 const packingForm = $("#packing-form");
-const packingInput = $("#packing-item-input");
 const packingList = $("#packing-list");
-const packingEmpty = $("#packing-empty");
 
 packingForm?.addEventListener("submit", event => {
   event.preventDefault();
 
-  // Read the exact input used by the supplied HTML.
   const input = $("#packing-item-input", packingForm);
   const name = String(input?.value || "").trim();
 
@@ -415,14 +392,14 @@ packingForm?.addEventListener("submit", event => {
     packed: false
   });
 
-  persistPacking();
+  saveData(STORAGE_KEYS.packing, packingItems);
 
-  if (input) input.value = "";
+  input.value = "";
 
   renderPacking();
   renderDashboard();
 
-  input?.focus();
+  input.focus();
   showToast("Packing item added!");
 });
 
@@ -431,7 +408,7 @@ function renderPacking() {
 
   const total = packingItems.length;
   const packed = packingItems.filter(item => item.packed).length;
-  const percent = total ? Math.round((packed / total) * 100) : 0;
+  const percent = total ? Math.round(packed / total * 100) : 0;
 
   const summary = $("#packing-summary");
   if (summary) {
@@ -448,9 +425,8 @@ function renderPacking() {
     progressTrack.setAttribute("aria-valuenow", String(percent));
   }
 
-  if (packingEmpty) {
-    packingEmpty.hidden = total > 0;
-  }
+  const empty = $("#packing-empty");
+  if (empty) empty.hidden = total > 0;
 
   packingList.innerHTML = packingItems.map(item => `
     <li class="packing-item ${item.packed ? "is-packed" : ""}">
@@ -461,7 +437,6 @@ function renderPacking() {
           data-item-id="${escapeHTML(item.id)}"
           ${item.packed ? "checked" : ""}
         >
-
         <span>${escapeHTML(item.name)}</span>
       </label>
 
@@ -469,10 +444,7 @@ function renderPacking() {
         type="button"
         class="text-btn delete-packing-btn"
         data-item-id="${escapeHTML(item.id)}"
-        aria-label="Delete ${escapeHTML(item.name)}"
-      >
-        Delete
-      </button>
+      >Delete</button>
     </li>
   `).join("");
 }
@@ -489,29 +461,31 @@ packingList?.addEventListener("change", event => {
 
   item.packed = checkbox.checked;
 
-  persistPacking();
+  saveData(STORAGE_KEYS.packing, packingItems);
+
   renderPacking();
   renderDashboard();
 });
 
 packingList?.addEventListener("click", event => {
-  const deleteButton = event.target.closest(".delete-packing-btn");
-  if (!deleteButton) return;
+  const button = event.target.closest(".delete-packing-btn");
+  if (!button) return;
 
-  const itemId = deleteButton.dataset.itemId;
+  packingItems = packingItems.filter(
+    item => item.id !== button.dataset.itemId
+  );
 
-  packingItems = packingItems.filter(item => item.id !== itemId);
+  saveData(STORAGE_KEYS.packing, packingItems);
 
-  persistPacking();
   renderPacking();
   renderDashboard();
 
   showToast("Packing item deleted.");
 });
 
-/* =========================================
+/* ==========================================
    EXPENSES
-========================================= */
+========================================== */
 
 const expenseForm = $("#expense-form");
 
@@ -538,15 +512,12 @@ function updateExpenseTripOptions() {
 expenseForm?.addEventListener("submit", event => {
   event.preventDefault();
 
-  const formData = new FormData(expenseForm);
+  const data = new FormData(expenseForm);
 
-  const description = String(
-    formData.get("description") || ""
-  ).trim();
-
-  const amount = Number(formData.get("amount"));
-  const category = String(formData.get("category") || "Other");
-  const tripId = String(formData.get("tripId") || "");
+  const description = String(data.get("description") || "").trim();
+  const amount = Number(data.get("amount"));
+  const category = String(data.get("category") || "Other");
+  const tripId = String(data.get("tripId") || "");
 
   if (!description) {
     showToast("Expense description enter karo.");
@@ -567,7 +538,7 @@ expenseForm?.addEventListener("submit", event => {
     date: new Date().toISOString()
   });
 
-  persistExpenses();
+  saveData(STORAGE_KEYS.expenses, expenses);
 
   expenseForm.reset();
   updateExpenseTripOptions();
@@ -606,9 +577,7 @@ function renderExpenses() {
           <strong>${escapeHTML(expense.description)}</strong>
           <p class="muted">
             ${escapeHTML(expense.category)}
-            · ${escapeHTML(formatDate(
-              expense.date ? expense.date.slice(0, 10) : ""
-            ))}
+            · ${escapeHTML(formatDate(expense.date?.slice(0, 10)))}
           </p>
           <small class="muted">
             ${trip
@@ -623,10 +592,7 @@ function renderExpenses() {
           type="button"
           class="text-btn delete-expense-btn"
           data-expense-id="${escapeHTML(expense.id)}"
-          aria-label="Delete ${escapeHTML(expense.description)}"
-        >
-          Delete
-        </button>
+        >Delete</button>
       </article>
     `;
   }).join("");
@@ -636,20 +602,21 @@ $("#expenses-list")?.addEventListener("click", event => {
   const button = event.target.closest(".delete-expense-btn");
   if (!button) return;
 
-  const expenseId = button.dataset.expenseId;
+  expenses = expenses.filter(
+    expense => expense.id !== button.dataset.expenseId
+  );
 
-  expenses = expenses.filter(expense => expense.id !== expenseId);
+  saveData(STORAGE_KEYS.expenses, expenses);
 
-  persistExpenses();
   renderExpenses();
   renderDashboard();
 
   showToast("Expense deleted.");
 });
 
-/* =========================================
+/* ==========================================
    DASHBOARD STATISTICS
-========================================= */
+========================================== */
 
 function renderDashboard() {
   const totalBudget = trips.reduce(
@@ -662,27 +629,29 @@ function renderDashboard() {
     0
   );
 
-  const totalItems = packingItems.length;
-  const packedItems = packingItems.filter(item => item.packed).length;
+  const totalPacking = packingItems.length;
+  const packedCount = packingItems.filter(item => item.packed).length;
 
-  const packingPercent = totalItems
-    ? Math.round((packedItems / totalItems) * 100)
+  const packingPercent = totalPacking
+    ? Math.round(packedCount / totalPacking * 100)
     : 0;
 
-  const tripStat = $("#stat-trips");
-  const budgetStat = $("#stat-budget");
-  const spentStat = $("#stat-spent");
-  const packingStat = $("#stat-packing");
-
-  if (tripStat) tripStat.textContent = String(trips.length);
-  if (budgetStat) budgetStat.textContent = money(totalBudget);
-  if (spentStat) spentStat.textContent = money(totalSpent);
-
-  if (packingStat) {
-    packingStat.textContent = `${packingPercent}%`;
+  if ($("#stat-trips")) {
+    $("#stat-trips").textContent = String(trips.length);
   }
 
-  // This is the progress bar inside the dashboard statistic card.
+  if ($("#stat-budget")) {
+    $("#stat-budget").textContent = money(totalBudget);
+  }
+
+  if ($("#stat-spent")) {
+    $("#stat-spent").textContent = money(totalSpent);
+  }
+
+  if ($("#stat-packing")) {
+    $("#stat-packing").textContent = `${packingPercent}%`;
+  }
+
   const dashboardProgress = $("#stat-packing")
     ?.closest(".stat-card")
     ?.querySelector("#packing-progress");
@@ -695,9 +664,9 @@ function renderDashboard() {
   updateExpenseTripOptions();
 }
 
-/* =========================================
-   INITIALIZE APP
-========================================= */
+/* ==========================================
+   INITIALIZE
+========================================== */
 
 function initializeApp() {
   renderDashboard();
