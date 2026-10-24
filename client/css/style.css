@@ -161,6 +161,7 @@ select:focus-visible {
     min-width: 0;
     margin-left: 245px;
     padding: 35px 42px;
+    overflow-x: hidden;
 }
 
 .topbar {
@@ -484,6 +485,21 @@ h1 {
     gap: 16px;
 }
 
+.trip-card {
+    min-width: 0;
+    padding: 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 5px 18px rgba(29, 48, 40, 0.035);
+}
+
+.trip-card-content { min-width: 0; }
+.trip-card h3 { margin: 7px 0 4px; overflow-wrap: anywhere; }
+.trip-destination { color: #9b7b47; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.trip-card-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin: 18px 0 12px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; }
+.trip-card .delete-trip-btn { padding: 6px 0; }
+
 .empty-state {
     grid-column: 1 / -1;
     text-align: center;
@@ -655,8 +671,12 @@ footer {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--border);
+    min-width: 0;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
 }
 
 .packing-list label {
@@ -665,6 +685,10 @@ footer {
     gap: 10px;
     overflow-wrap: anywhere;
 }
+
+.packing-item-label { min-width: 0; }
+.packing-item-label span { overflow-wrap: anywhere; }
+.packing-list button { flex-shrink: 0; }
 
 .packing-list input[type="checkbox"] {
     accent-color: var(--primary);
@@ -692,15 +716,41 @@ footer {
 }
 
 /* ========================================
-   EXPENSE FORM — CLEAN LAYOUT
+   EXPENSES
 ======================================== */
+
+#expenses-list { display: grid; gap: 10px; }
+
+.expense-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    box-shadow: 0 4px 14px rgba(29, 48, 40, 0.035);
+}
+
+.expense-details { flex: 1; min-width: 0; }
+.expense-details strong { overflow-wrap: anywhere; }
+.expense-details .muted { margin-top: 3px; }
+.expense-details small { display: block; margin-top: 3px; font-size: 11px; }
+.expense-amount { flex-shrink: 0; color: var(--primary-dark); font-size: 15px; white-space: nowrap; }
+.delete-expense-btn { flex-shrink: 0; padding: 7px 9px; border-radius: 8px; }
+.delete-expense-btn:hover, .delete-trip-btn:hover, .delete-packing-btn:hover { background: #f4ead8; }
 
 #expense-form {
     display: flex;
     align-items: flex-end;
     flex-wrap: wrap;
-    gap: 18px 24px;
+    gap: 16px;
     width: 100%;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
 }
 
 /* Labels and fields stay together */
@@ -708,36 +758,38 @@ footer {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
     margin: 0;
-    font-size: 15px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
 }
 
 /* Expense description */
 #expense-form input[name="description"] {
-    width: 215px;
+    width: clamp(150px, 19vw, 215px);
     height: 38px;
     min-height: 38px;
     padding: 7px 10px;
-    border: 1px solid #888;
-    border-radius: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
     background: var(--surface);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
 }
 
 /* Amount */
 #expense-form input[name="amount"] {
-    width: 215px;
+    width: clamp(120px, 14vw, 160px);
     height: 38px;
     min-height: 38px;
     padding: 7px 10px;
-    border: 1px solid #888;
-    border-radius: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
     background: var(--surface);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
 }
 
 /* Category dropdown */
@@ -746,11 +798,11 @@ footer {
     height: 38px;
     min-height: 38px;
     padding: 5px 8px;
-    border: 1px solid #888;
-    border-radius: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
     background: var(--surface);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     box-sizing: border-box;
     cursor: pointer;
 }
@@ -761,13 +813,18 @@ footer {
     height: 38px;
     min-height: 38px;
     padding: 5px 8px;
-    border: 1px solid #888;
-    border-radius: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
     background: var(--surface);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     box-sizing: border-box;
     cursor: pointer;
+}
+
+#expense-form input:focus, #expense-form select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(185, 149, 91, 0.14);
 }
 
 /* Add expense button */
@@ -824,6 +881,7 @@ footer {
     .sidebar nav {
         display: flex;
         overflow-x: auto;
+        min-width: 0;
         gap: 5px;
     }
 
@@ -840,6 +898,7 @@ footer {
 
     .topbar {
         align-items: flex-start;
+        flex-wrap: wrap;
     }
 
     .topbar .primary-btn {
@@ -887,6 +946,7 @@ footer {
         align-items: stretch;
         flex-direction: column;
         gap: 16px;
+        padding: 16px;
     }
 
     #expense-form label {
@@ -908,4 +968,14 @@ footer {
         min-height: 44px;
         align-self: stretch;
     }
+
+    .expense-row {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        padding: 14px;
+    }
+
+    .expense-details { flex-basis: 100%; }
+    .expense-amount { margin-right: auto; }
 }

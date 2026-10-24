@@ -3,7 +3,8 @@
 
 /* ==========================================
    TRIPLITE — COMPLETE APP.JS
-   Storage: LocalStorage
+   Trips: MongoDB
+   Packing + Expenses: LocalStorage
 ========================================== */
 
 const $ = (selector, parent = document) =>
@@ -66,7 +67,15 @@ function money(amount) {
 function formatDate(dateString) {
   if (!dateString) return "Date not set";
 
-  const date = new Date(`${dateString}T00:00:00`);
+  // Handle date-only strings without timezone shifting.
+  const datePart = String(dateString).slice(0, 10);
+  const parts = datePart.split("-").map(Number);
+
+  if (parts.length !== 3 || parts.some(Number.isNaN)) {
+    return dateString;
+  }
+
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
 
   if (Number.isNaN(date.getTime())) return dateString;
 
@@ -89,6 +98,50 @@ function showToast(message) {
   toastTimer = setTimeout(() => {
     toast.classList.remove("show");
   }, 2600);
+}
+
+/* ==========================================
+   MONGODB API HELPERS
+========================================== */
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers
+    }
+  });
+
+  let result;
+
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error("Server returned an invalid response.");
+  }
+
+  if (!response.ok || result.success !== true) {
+    throw new Error(
+      result.message || `Request failed (${response.status})`
+    );
+  }
+
+  return result;
+}
+
+// Convert MongoDB's _id into the id used by existing UI code.
+function normalizeTrip(trip) {
+  const id = trip._id || trip.id;
+
+  return {
+    ...trip,
+    id: String(id),
+    startDate: String(trip.startDate).slice(0, 10),
+    endDate: String(trip.endDate).slice(0, 10),
+    travellers: Number(trip.travellers),
+    budget: Number(trip.budget)
+  };
 }
 
 /* ==========================================
@@ -137,7 +190,6 @@ function showView(viewName) {
     title.textContent = pageTitles[viewName];
   }
 
-  // CREATE TRIP BUTTON VISIBILITY
   const createTripButton = $("#add-trip-btn");
 
   if (createTripButton) {
@@ -175,7 +227,8 @@ const tripForm = $("#trip-form");
 function openTripDialog() {
   if (!tripDialog) return;
 
-  $("#form-error").textContent = "";
+  const error = $("#form-error");
+  if (error) error.textContent = "";
 
   if (typeof tripDialog.showModal === "function") {
     tripDialog.showModal();
@@ -202,7 +255,11 @@ tripDialog?.addEventListener("click", event => {
   if (event.target === tripDialog) closeTripDialog();
 });
 
-tripForm?.addEventListener("submit", event => {
+/* ==========================================
+   CREATE TRIP — SAVE TO MONGODB
+========================================== */
+
+tripForm?.addEventListener("submit", async event => {
   event.preventDefault();
 
   const data = new FormData(tripForm);
@@ -215,53 +272,90 @@ tripForm?.addEventListener("submit", event => {
   const budget = Number(data.get("budget"));
 
   const error = $("#form-error");
+  if (error) error.textContent = "";
 
   if (!name || !destination || !startDate || !endDate) {
-    error.textContent = "Please fill in all required fields.";
+    if (error) {
+      error.textContent = "Please fill in all required fields.";
+    }
     return;
   }
 
   if (endDate < startDate) {
-    error.textContent = "End date cannot be before start date.";
+    if (error) {
+      error.textContent = "End date cannot be before start date.";
+    }
     return;
   }
 
-  if (!Number.isFinite(travellers) || travellers < 1) {
-    error.textContent = "Enter a valid number of travellers.";
+  if (!Number.isInteger(travellers) || travellers < 1) {
+    if (error) {
+      error.textContent = "Enter a valid number of travellers.";
+    }
     return;
   }
 
   if (!Number.isFinite(budget) || budget < 0) {
-    error.textContent = "Enter a valid budget.";
+    if (error) {
+      error.textContent = "Enter a valid budget.";
+    }
     return;
   }
 
-  trips.unshift({
-    id: createId(),
-    name,
-    destination,
-    startDate,
-    endDate,
-    travellers,
-    budget,
-    createdAt: new Date().toISOString()
-  });
+  const submitButton = tripForm.querySelector(
+    'button[type="submit"]'
+  );
 
-  saveData(STORAGE_KEYS.trips, trips);
+  if (submitButton) submitButton.disabled = true;
 
-  tripForm.reset();
+  try {
+    const result = await apiRequest("/api/trips", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        destination,
+        startDate,
+        endDate,
+        travellers,
+        budget
+      })
+    });
 
-  tripForm.elements.namedItem("travellers").value = "1";
-  tripForm.elements.namedItem("budget").value = "10000";
+    const newTrip = normalizeTrip(result.data);
 
-  closeTripDialog();
+    trips.unshift(newTrip);
+    saveData(STORAGE_KEYS.trips, trips);
 
-  renderDashboard();
-  renderAllTrips();
-  updateExpenseTripOptions();
+    tripForm.reset();
 
-  showView("dashboard");
-  showToast("Trip created successfully!");
+    tripForm.elements.namedItem("travellers").value = "1";
+    tripForm.elements.namedItem("budget").value = "10000";
+
+    closeTripDialog();
+
+    renderDashboard();
+    renderAllTrips();
+    updateExpenseTripOptions();
+
+    showView("dashboard");
+    showToast("Trip saved to MongoDB!");
+  } catch (error) {
+    console.error("Create trip failed:", error);
+
+    if (error) {
+      error.textContent =
+        error.message || "Could not save trip. Please try again.";
+    }
+
+    // The variable above shadows the form error element.
+    const formError = $("#form-error");
+    if (formError) {
+      formError.textContent =
+        error.message || "Could not save trip. Please try again.";
+    }
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
 });
 
 /* ==========================================
@@ -337,7 +431,11 @@ function renderRecentTrips() {
   );
 }
 
-document.addEventListener("click", event => {
+/* ==========================================
+   DELETE TRIP — DELETE FROM MONGODB
+========================================== */
+
+document.addEventListener("click", async event => {
   const button = event.target.closest(".delete-trip-btn");
   if (!button) return;
 
@@ -348,27 +446,41 @@ document.addEventListener("click", event => {
 
   if (!confirm(`Delete "${trip.name}"?`)) return;
 
-  trips = trips.filter(item => item.id !== tripId);
+  button.disabled = true;
 
-  expenses = expenses.map(expense =>
-    expense.tripId === tripId
-      ? { ...expense, tripId: "" }
-      : expense
-  );
+  try {
+    await apiRequest(
+      `/api/trips/${encodeURIComponent(tripId)}`,
+      { method: "DELETE" }
+    );
 
-  saveData(STORAGE_KEYS.trips, trips);
-  saveData(STORAGE_KEYS.expenses, expenses);
+    trips = trips.filter(item => item.id !== tripId);
 
-  renderDashboard();
-  renderAllTrips();
-  renderExpenses();
-  updateExpenseTripOptions();
+    // Keep expenses, but unlink them from the deleted trip.
+    expenses = expenses.map(expense =>
+      expense.tripId === tripId
+        ? { ...expense, tripId: "" }
+        : expense
+    );
 
-  showToast("Trip deleted.");
+    saveData(STORAGE_KEYS.trips, trips);
+    saveData(STORAGE_KEYS.expenses, expenses);
+
+    renderDashboard();
+    renderAllTrips();
+    renderExpenses();
+    updateExpenseTripOptions();
+
+    showToast("Trip deleted from MongoDB!");
+  } catch (error) {
+    console.error("Delete trip failed:", error);
+    showToast(error.message || "Could not delete trip.");
+    button.disabled = false;
+  }
 });
 
 /* ==========================================
-   PACKING CHECKLIST
+   PACKING CHECKLIST — LOCALSTORAGE
 ========================================== */
 
 const packingForm = $("#packing-form");
@@ -484,7 +596,7 @@ packingList?.addEventListener("click", event => {
 });
 
 /* ==========================================
-   EXPENSES
+   EXPENSES — LOCALSTORAGE
 ========================================== */
 
 const expenseForm = $("#expense-form");
@@ -668,13 +780,30 @@ function renderDashboard() {
    INITIALIZE
 ========================================== */
 
-function initializeApp() {
+async function initializeApp() {
+  // Display saved data while the database request is in progress.
   renderDashboard();
   renderAllTrips();
   renderPacking();
   renderExpenses();
   updateExpenseTripOptions();
   showView("dashboard");
+
+  try {
+    const result = await apiRequest("/api/trips");
+
+    trips = result.data.map(normalizeTrip);
+    saveData(STORAGE_KEYS.trips, trips);
+
+    renderDashboard();
+    renderAllTrips();
+    updateExpenseTripOptions();
+
+    console.log("Trips loaded from MongoDB:", trips.length);
+  } catch (error) {
+    console.error("Could not load MongoDB trips:", error);
+    showToast("Database unavailable. Showing saved local data.");
+  }
 }
 
 initializeApp();
