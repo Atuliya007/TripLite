@@ -422,24 +422,56 @@ h1 {
 .destination-card {
     position: relative;
     height: 235px;
-    overflow: hidden;
     border-radius: var(--radius);
-    background: #d9ded5;
-    box-shadow: 0 8px 22px rgba(24, 53, 46, 0.09);
+    background: transparent;
+    perspective: 1000px;
+    outline: none;
 }
 
-.destination-card img {
+.destination-card:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 4px;
+}
+
+.destination-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius);
+    box-shadow: 0 8px 22px rgba(24, 53, 46, 0.09);
+    transform-style: preserve-3d;
+    transition: transform 0.65s cubic-bezier(0.2, 0.7, 0.25, 1);
+}
+
+.destination-card.is-flipped .destination-card-inner {
+    transform: rotateY(180deg);
+}
+
+.destination-face {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: var(--radius);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+.destination-front {
+    background: #d9ded5;
+}
+
+.destination-front img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transition: transform 0.5s ease;
 }
 
-.destination-card:hover img {
+.destination-card:hover .destination-front img {
     transform: scale(1.07);
 }
 
-.destination-card::after {
+.destination-front::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -456,6 +488,111 @@ h1 {
     bottom: 18px;
     left: 18px;
     color: #fffdf7;
+}
+
+.destination-flip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+    padding: 5px 9px;
+    border: 1px solid rgba(255, 253, 247, 0.68);
+    border-radius: 999px;
+    background: rgba(20, 39, 32, 0.5);
+    color: #fffdf7;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.destination-flip:focus-visible,
+.plan-trip-btn:focus-visible {
+    outline: 2px solid #e5c991;
+    outline-offset: 2px;
+}
+
+.destination-back {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 15px 16px 13px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    background: #fbfaf6;
+    color: #293b34;
+    transform: rotateY(180deg);
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.destination-back-heading,
+.destination-back-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.destination-back-heading span {
+    color: #9b7b47;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+}
+
+.destination-back-heading h3 {
+    margin: 2px 0 0;
+    font-size: 17px;
+}
+
+.destination-flip-back {
+    flex: 0 0 auto;
+    margin: 0;
+    border-color: #d8d5cb;
+    background: #fff;
+    color: #32443a;
+}
+
+.destination-estimate,
+.destination-costs,
+.destination-tip { margin: 0; }
+
+.destination-estimate strong {
+    color: #29483b;
+    font-size: 15px;
+}
+
+.destination-estimate span {
+    margin-left: 4px;
+    color: #68746d;
+}
+
+.destination-costs,
+.destination-tip {
+    color: #56645c;
+}
+
+.destination-back-actions {
+    margin-top: auto;
+    color: #68746d;
+    font-size: 9px;
+}
+
+.plan-trip-btn {
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fffdf7;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .destination-card-inner,
+    .destination-front img { transition-duration: 0.01ms; }
 }
 
 .destination-overlay span {
@@ -495,7 +632,9 @@ h1 {
 }
 
 .trip-card-content { min-width: 0; }
+.trip-card-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .trip-card h3 { margin: 7px 0 4px; overflow-wrap: anywhere; }
+.budget-alert-dot { display: inline-block; width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #c3483f; box-shadow: 0 0 0 3px rgba(195, 72, 63, 0.12); }
 .trip-destination { color: #9b7b47; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
 .trip-card-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin: 18px 0 12px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; }
 .trip-budget-status { margin: -5px 0 14px; color: var(--primary); font-size: 12px; font-weight: 700; }
@@ -661,6 +800,32 @@ footer {
     border: 1px solid var(--border);
     border-radius: 10px;
     font: inherit;
+}
+
+.packing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin: -8px 0 18px;
+}
+
+.packing-actions .primary-btn {
+    padding: 10px 14px;
+}
+
+.packing-category-heading {
+    display: block !important;
+    margin: 18px 0 8px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+
+.packing-category-heading h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 13px;
 }
 
 .packing-list {

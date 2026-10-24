@@ -238,9 +238,7 @@ function setTripDialogMode(isEditing) {
   }
 }
 
-function openTripDialog() {
-  if (!tripDialog) return;
-
+function resetTripDialogState() {
   editingTripId = null;
   tripForm?.reset();
   if (tripForm) {
@@ -251,6 +249,15 @@ function openTripDialog() {
 
   const error = $("#form-error");
   if (error) error.textContent = "";
+}
+
+function openTripDialog(destination = "") {
+  if (!tripDialog) return;
+
+  resetTripDialogState();
+  if (typeof destination === "string" && destination && tripForm) {
+    tripForm.elements.namedItem("destination").value = destination;
+  }
 
   if (typeof tripDialog.showModal === "function") {
     tripDialog.showModal();
@@ -258,6 +265,49 @@ function openTripDialog() {
     tripDialog.setAttribute("open", "");
   }
 }
+
+function setDestinationCardFlipped(card, flipped) {
+  card.classList.toggle("is-flipped", flipped);
+  card.querySelector(".destination-front").inert = flipped;
+  card.querySelector(".destination-back").inert = !flipped;
+  card.querySelectorAll(".destination-flip").forEach(button => {
+    button.setAttribute("aria-pressed", String(flipped));
+  });
+}
+
+$$(".destination-card").forEach(card => {
+  card.querySelector(".destination-back").inert = true;
+  card.addEventListener("pointerenter", event => {
+    if (event.pointerType === "mouse") setDestinationCardFlipped(card, true);
+  });
+  card.addEventListener("pointerleave", event => {
+    if (event.pointerType === "mouse" && !card.contains(document.activeElement)) {
+      setDestinationCardFlipped(card, false);
+    }
+  });
+  card.addEventListener("click", event => {
+    const planButton = event.target.closest(".plan-trip-btn");
+    if (planButton) {
+      openTripDialog(planButton.dataset.destination || "");
+      return;
+    }
+
+    if (event.target.closest(".destination-flip")) {
+      setDestinationCardFlipped(card, !card.classList.contains("is-flipped"));
+      return;
+    }
+
+    if (!event.target.closest("button")) {
+      setDestinationCardFlipped(card, !card.classList.contains("is-flipped"));
+    }
+  });
+
+  card.addEventListener("keydown", event => {
+    if (event.target !== card || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    setDestinationCardFlipped(card, !card.classList.contains("is-flipped"));
+  });
+});
 
 function openEditTripDialog(trip) {
   if (!tripDialog || !tripForm) return;
@@ -289,15 +339,27 @@ function closeTripDialog() {
   } else {
     tripDialog.removeAttribute("open");
   }
+
+  resetTripDialogState();
 }
 
-$("#add-trip-btn")?.addEventListener("click", openTripDialog);
-$("#banner-create-btn")?.addEventListener("click", openTripDialog);
+$("#add-trip-btn")?.addEventListener("click", () => openTripDialog());
+$("#banner-create-btn")?.addEventListener("click", () => openTripDialog());
 $("#close-dialog")?.addEventListener("click", closeTripDialog);
 
 tripDialog?.addEventListener("click", event => {
-  if (event.target === tripDialog) closeTripDialog();
+  if (event.target !== tripDialog) return;
+
+  const bounds = tripDialog.getBoundingClientRect();
+  const clickedOutside =
+    event.clientX < bounds.left ||
+    event.clientX > bounds.right ||
+    event.clientY < bounds.top ||
+    event.clientY > bounds.bottom;
+
+  if (clickedOutside) closeTripDialog();
 });
+tripDialog?.addEventListener("close", resetTripDialogState);
 
 /* ==========================================
    CREATE AND EDIT TRIPS — MONGODB
@@ -421,7 +483,8 @@ function tripCardHTML(trip) {
     .filter(expense => getExpenseTripId(expense) === trip.id)
     .reduce((sum, expense) => sum + expenseAmount(expense), 0);
   const remainingBudget = Number(trip.budget) - spent;
-  const budgetStatus = remainingBudget < 0
+  const overBudget = spent > Number(trip.budget);
+  const budgetStatus = overBudget
     ? `Over budget by ${money(Math.abs(remainingBudget))}`
     : `Remaining: ${money(remainingBudget)}`;
 
@@ -432,7 +495,10 @@ function tripCardHTML(trip) {
           ${escapeHTML(trip.destination)}
         </span>
 
-        <h3>${escapeHTML(trip.name)}</h3>
+        <div class="trip-card-title">
+          <h3>${escapeHTML(trip.name)}</h3>
+          ${overBudget ? '<span class="budget-alert-dot" role="img" aria-label="Over budget" title="Over budget"></span>' : ""}
+        </div>
 
         <p class="muted">
           ${escapeHTML(formatDate(trip.startDate))}
@@ -445,7 +511,7 @@ function tripCardHTML(trip) {
           <span>Budget: <strong>${money(trip.budget)}</strong></span>
           <span>Spent: <strong>${money(spent)}</strong></span>
         </div>
-        <p class="trip-budget-status${remainingBudget < 0 ? " is-over-budget" : ""}">
+        <p class="trip-budget-status${overBudget ? " is-over-budget" : ""}">
           ${escapeHTML(budgetStatus)}
         </p>
 
@@ -560,6 +626,118 @@ document.addEventListener("click", async event => {
 const packingForm = $("#packing-form");
 const packingList = $("#packing-list");
 
+const PACKING_CATEGORIES = [
+  {
+    name: "Identity and Documents",
+    items: [
+      "Aadhaar card or valid government ID",
+      "Driving licence (when needed)",
+      "Passport (for international travel)",
+      "Visa and entry permits (when required)",
+      "Tickets and booking confirmations",
+      "Travel insurance details",
+      "Emergency contact information"
+    ]
+  },
+  {
+    name: "Money and Essentials",
+    items: ["Wallet and cash", "Debit/credit cards", "UPI/payment access", "Emergency cash"]
+  },
+  {
+    name: "Electronics",
+    items: [
+      "Phone and charger",
+      "Power bank",
+      "Earphones",
+      "Camera accessories (if needed)",
+      "Travel adapter (if needed)"
+    ]
+  },
+  {
+    name: "Clothing and Personal Care",
+    items: [
+      "Clothes and extra outfit",
+      "Underwear and socks",
+      "Weather-appropriate clothing",
+      "Comfortable shoes",
+      "Toothbrush and toiletries",
+      "Sunscreen and sunglasses"
+    ]
+  },
+  {
+    name: "Health and Safety",
+    items: [
+      "Personal medicines",
+      "Basic first-aid supplies",
+      "Prescriptions (when needed)",
+      "Hand sanitizer",
+      "Water bottle",
+      "Emergency contacts saved offline"
+    ]
+  },
+  {
+    name: "Before Leaving Home",
+    items: [
+      "Check weather and transport status",
+      "Confirm accommodation and tickets",
+      "Charge devices",
+      "Download offline maps and tickets",
+      "Lock doors and windows",
+      "Switch off unnecessary appliances"
+    ]
+  }
+];
+
+const normalizePackingName = name => String(name || "").trim().toLocaleLowerCase();
+
+$("#use-standard-checklist")?.addEventListener("click", () => {
+  const existingNames = new Set(packingItems.map(item => normalizePackingName(item.name)));
+  let added = 0;
+
+  PACKING_CATEGORIES.forEach(category => {
+    category.items.forEach(name => {
+      const normalizedName = normalizePackingName(name);
+      if (existingNames.has(normalizedName)) return;
+
+      packingItems.push({
+        id: createId(),
+        name,
+        packed: false,
+        category: category.name
+      });
+      existingNames.add(normalizedName);
+      added += 1;
+    });
+  });
+
+  if (added) {
+    saveData(STORAGE_KEYS.packing, packingItems);
+    renderPacking();
+    renderDashboard();
+    showToast(`${added} standard items added.`);
+  } else {
+    showToast("Standard checklist items are already in your list.");
+  }
+});
+
+$("#reset-packed-items")?.addEventListener("click", () => {
+  const completed = packingItems.filter(item => item.packed);
+  if (!completed.length) {
+    showToast("There are no completed items to reset.");
+    return;
+  }
+
+  if (!confirm(`Uncheck ${completed.length} completed checklist item${completed.length === 1 ? "" : "s"}?`)) return;
+
+  packingItems.forEach(item => {
+    item.packed = false;
+  });
+  saveData(STORAGE_KEYS.packing, packingItems);
+  renderPacking();
+  renderDashboard();
+  showToast("Completed items reset.");
+});
+
 packingForm?.addEventListener("submit", event => {
   event.preventDefault();
 
@@ -598,7 +776,7 @@ function renderPacking() {
 
   const summary = $("#packing-summary");
   if (summary) {
-    summary.textContent = `${packed} of ${total} packed`;
+    summary.textContent = `${packed} of ${total} packed · ${total - packed} remaining`;
   }
 
   const progressBar = $("#packing-progress-bar");
@@ -614,24 +792,26 @@ function renderPacking() {
   const empty = $("#packing-empty");
   if (empty) empty.hidden = total > 0;
 
-  packingList.innerHTML = packingItems.map(item => `
-    <li class="packing-item ${item.packed ? "is-packed" : ""}">
-      <label class="packing-item-label">
-        <input
-          type="checkbox"
-          class="packing-toggle"
-          data-item-id="${escapeHTML(item.id)}"
-          ${item.packed ? "checked" : ""}
-        >
-        <span>${escapeHTML(item.name)}</span>
-      </label>
+  const renderItem = item => `
+      <li class="packing-item ${item.packed ? "is-packed" : ""}">
+        <label class="packing-item-label">
+          <input type="checkbox" class="packing-toggle" data-item-id="${escapeHTML(item.id)}" ${item.packed ? "checked" : ""}>
+          <span>${escapeHTML(item.name)}</span>
+        </label>
+        <button type="button" class="text-btn delete-packing-btn" data-item-id="${escapeHTML(item.id)}">Delete</button>
+      </li>`;
 
-      <button
-        type="button"
-        class="text-btn delete-packing-btn"
-        data-item-id="${escapeHTML(item.id)}"
-      >Delete</button>
-    </li>
+  const categorized = new Set(PACKING_CATEGORIES.map(category => category.name));
+  const sections = PACKING_CATEGORIES.map(category => ({
+    name: category.name,
+    items: packingItems.filter(item => item.category === category.name)
+  })).filter(section => section.items.length);
+  const customItems = packingItems.filter(item => !categorized.has(item.category));
+  if (customItems.length) sections.push({ name: "My items", items: customItems });
+
+  packingList.innerHTML = sections.map(section => `
+    <li class="packing-category-heading" role="presentation"><h3>${escapeHTML(section.name)}</h3></li>
+    ${section.items.map(renderItem).join("")}
   `).join("");
 }
 
