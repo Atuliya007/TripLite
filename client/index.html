@@ -4,23 +4,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#25483f">
+
   <title>TripLite | Travel Dashboard</title>
 
-<link rel="stylesheet" href="/css/style.css">
-<script src="/js/app.js" defer></script>
-
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
 </head>
+
 <body>
   <div class="app-shell">
+
+    <!-- SIDEBAR -->
     <aside class="sidebar">
-      <a class="brand" href="#">✈ TripLite</a>
+      <a class="brand" href="#" data-view="dashboard">✈ TripLite</a>
 
       <p class="nav-heading">MENU</p>
-      <nav>
-        <button class="nav-link active" data-view="dashboard">▦ Dashboard</button>
-        <button class="nav-link" data-view="trips">▣ My Trips</button>
-        <button class="nav-link" data-view="checklist">✓ Packing Checklist</button>
-        <button class="nav-link" data-view="expenses">₹ Expenses</button>
+
+      <nav aria-label="Main navigation">
+        <button type="button" class="nav-link active" data-view="dashboard">
+          ▦ Dashboard
+        </button>
+
+        <button type="button" class="nav-link" data-view="trips">
+          ▣ My Trips
+        </button>
+
+        <button type="button" class="nav-link" data-view="checklist">
+          ✓ Packing Checklist
+        </button>
+
+        <button type="button" class="nav-link" data-view="expenses">
+          ₹ Expenses
+        </button>
       </nav>
 
       <div class="sidebar-bottom">
@@ -32,118 +48,401 @@
       </div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="main-content">
+
+      <!-- TOP HEADER -->
       <header class="topbar">
         <div>
           <p class="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
           <h1 id="page-title">Travel Dashboard</h1>
           <p class="muted">Plan less. Explore more.</p>
         </div>
-        <button class="primary-btn" id="add-trip-btn">+ Create a trip</button>
+
+        <button type="button" class="primary-btn" id="add-trip-btn">
+          + Create a trip
+        </button>
       </header>
 
-      <section class="welcome-banner">
-        <div>
-          <span class="banner-tag">YOUR TRAVEL COMPANION</span>
-          <h2>Where will you go next?</h2>
-          <p>Your trips, budget and packing essentials — all in one place.</p>
-          <button class="light-btn" id="banner-create-btn">Plan a trip →</button>
-        </div>
-        <div class="banner-decoration">✈</div>
+      <!-- DASHBOARD VIEW -->
+      <section id="dashboard-view">
+
+        <section class="welcome-banner">
+          <div>
+            <span class="banner-tag">YOUR TRAVEL COMPANION</span>
+            <h2>Where will you go next?</h2>
+            <p>Your trips, budget and packing essentials — all in one place.</p>
+
+            <button type="button" class="light-btn" id="banner-create-btn">
+              Plan a trip →
+            </button>
+          </div>
+
+          <div class="banner-decoration" aria-hidden="true">✈</div>
+        </section>
+
+        <!-- DASHBOARD STATISTICS -->
+        <section class="stats-grid">
+
+          <article class="stat-card">
+            <span class="stat-icon purple">✈</span>
+            <p>Total trips</p>
+            <h2 id="stat-trips">0</h2>
+            <small>Your adventures</small>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-icon green">₹</span>
+            <p>Total budget</p>
+            <h2 id="stat-budget">₹0</h2>
+            <small>Across your trips</small>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-icon orange">↗</span>
+            <p>Total spent</p>
+            <h2 id="stat-spent">₹0</h2>
+            <small>Your recorded expenses</small>
+          </article>
+
+          <article class="stat-card">
+            <span class="stat-icon blue">✓</span>
+            <p>Packing progress</p>
+            <h2 id="stat-packing">0%</h2>
+
+            <div class="progress-track">
+              <span id="packing-progress" style="width: 0%"></span>
+            </div>
+          </article>
+
+        </section>
+
+        <!-- POPULAR DESTINATIONS -->
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>Popular destinations</h2>
+              <p class="muted">Get inspired for your next escape.</p>
+            </div>
+          </div>
+
+          <div class="destination-grid">
+
+            <article class="destination-card">
+              <img
+                src="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=700&q=80"
+                alt="Taj Mahal in Agra"
+                loading="lazy"
+              >
+
+              <div class="destination-overlay">
+                <span>INDIA</span>
+                <h3>Agra</h3>
+                <p>History &amp; heritage</p>
+              </div>
+            </article>
+
+            <article class="destination-card">
+              <img
+                src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=700&q=80"
+                alt="Goa beach"
+                loading="lazy"
+              >
+
+              <div class="destination-overlay">
+                <span>INDIA</span>
+                <h3>Goa</h3>
+                <p>Beaches &amp; sunsets</p>
+              </div>
+            </article>
+
+            <article class="destination-card">
+              <img
+                src="https://images.unsplash.com/photo-1477587458883-47145ed94245?auto=format&fit=crop&w=700&q=80"
+                alt="Jaipur architecture"
+                loading="lazy"
+              >
+
+              <div class="destination-overlay">
+                <span>INDIA</span>
+                <h3>Jaipur</h3>
+                <p>Culture &amp; colour</p>
+              </div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- RECENT TRIPS -->
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>My trips</h2>
+              <p class="muted">Your upcoming adventures in one view.</p>
+            </div>
+
+            <button type="button" class="text-btn" id="view-all-trips">
+              View all →
+            </button>
+          </div>
+
+          <div id="trips-container" class="trips-grid">
+            <div class="empty-state">
+              <span>🧳</span>
+              <h3>Your story starts here</h3>
+              <p>Create your first trip to see it here.</p>
+            </div>
+          </div>
+        </section>
+
       </section>
 
-      <section class="stats-grid">
-        <article class="stat-card">
-          <span class="stat-icon purple">✈</span>
-          <p>Total trips</p>
-          <h2 id="stat-trips">0</h2>
-          <small>Your adventures</small>
-        </article>
-        <article class="stat-card">
-          <span class="stat-icon green">₹</span>
-          <p>Total budget</p>
-          <h2 id="stat-budget">₹0</h2>
-          <small>Across your trips</small>
-        </article>
-        <article class="stat-card">
-          <span class="stat-icon orange">↗</span>
-          <p>Total spent</p>
-          <h2 id="stat-spent">₹0</h2>
-          <small>Your recorded expenses</small>
-        </article>
-        <article class="stat-card">
-          <span class="stat-icon blue">✓</span>
-          <p>Packing progress</p>
-          <h2 id="stat-packing">0%</h2>
-          <div class="progress-track"><span id="packing-progress"></span></div>
-        </article>
-      </section>
-
-      <section class="section-block">
+      <!-- ALL TRIPS VIEW -->
+      <section class="section-block" id="all-trips-view" hidden>
         <div class="section-heading">
           <div>
-            <h2>Popular destinations</h2>
-            <p class="muted">Get inspired for your next escape.</p>
+            <h2>All your trips</h2>
+            <p class="muted">Manage your planned adventures.</p>
           </div>
         </div>
-        <div class="destination-grid">
-          <article class="destination-card">
-            <img src="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=700&q=80" alt="Taj Mahal in Agra">
-            <div class="destination-overlay"><span>INDIA</span><h3>Agra</h3><p>History & heritage</p></div>
-          </article>
-          <article class="destination-card">
-            <img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=700&q=80" alt="Goa beach">
-            <div class="destination-overlay"><span>INDIA</span><h3>Goa</h3><p>Beaches & sunsets</p></div>
-          </article>
-          <article class="destination-card">
-            <img src="https://images.unsplash.com/photo-1477587458883-47145ed94245?auto=format&fit=crop&w=700&q=80" alt="Jaipur architecture">
-            <div class="destination-overlay"><span>INDIA</span><h3>Jaipur</h3><p>Culture & colour</p></div>
-          </article>
-        </div>
+
+        <div id="all-trips-container" class="trips-grid"></div>
       </section>
 
-      <section class="section-block">
+      <!-- PACKING CHECKLIST VIEW -->
+      <section class="section-block" id="checklist-section" hidden>
+
         <div class="section-heading">
           <div>
-            <h2>My trips</h2>
-            <p class="muted">Your upcoming adventures in one view.</p>
+            <h2>Packing Checklist</h2>
+            <p class="muted">Everything you need for your next adventure.</p>
           </div>
-          <button class="text-btn" id="view-all-trips">View all →</button>
+
+          <!-- Matches app.js: $("#packing-summary") -->
+          <span id="packing-summary">0 of 0 packed</span>
         </div>
-        <div id="trips-container" class="trips-grid">
-          <div class="empty-state">
-            <span>🧳</span>
-            <h3>Your story starts here</h3>
-            <p>Create your first trip to see it here.</p>
+
+        <form id="packing-form" class="packing-form">
+          <input
+            id="packing-item-input"
+            name="item"
+            type="text"
+            placeholder="e.g. Passport, charger, clothes"
+            maxlength="100"
+            autocomplete="off"
+            required
+          >
+
+          <button type="submit" class="primary-btn">
+            + Add item
+          </button>
+        </form>
+
+        <div
+          class="progress-track packing-progress-track"
+          role="progressbar"
+          aria-label="Packing progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <span id="packing-progress-bar" style="width: 0%"></span>
+        </div>
+
+        <ul id="packing-list" class="packing-list"></ul>
+
+        <p id="packing-empty" class="muted">
+          Your checklist is empty. Add your first item!
+        </p>
+
+      </section>
+
+      <!-- EXPENSES VIEW -->
+      <section class="section-block" id="expenses-section" hidden>
+
+        <div class="section-heading">
+          <div>
+            <h2>Travel Expenses</h2>
+            <p class="muted">Track your spending and stay within budget.</p>
           </div>
         </div>
+
+        <section class="stats-grid">
+
+          <article class="stat-card">
+            <p>Total spent</p>
+            <h2 id="expense-total">₹0</h2>
+          </article>
+
+          <article class="stat-card">
+            <p>Total transactions</p>
+            <h2 id="expense-count">0</h2>
+          </article>
+
+        </section>
+
+        <!-- ADD EXPENSE FORM -->
+        <form id="expense-form" class="expense-form">
+
+          <label>
+            Expense description
+            <input
+              type="text"
+              name="description"
+              placeholder="e.g. Hotel booking"
+              maxlength="100"
+              required
+            >
+          </label>
+
+          <label>
+            Amount (₹)
+            <input
+              type="number"
+              name="amount"
+              min="0.01"
+              step="0.01"
+              placeholder="e.g. 1500"
+              required
+            >
+          </label>
+
+          <label>
+            Category
+            <select name="category" required>
+              <option value="Transport">Transport</option>
+              <option value="Accommodation">Accommodation</option>
+              <option value="Food">Food</option>
+              <option value="Activities">Activities</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+
+          <label>
+            Related trip
+            <select name="tripId" id="expense-trip">
+              <option value="">General expense</option>
+            </select>
+          </label>
+
+          <button type="submit" class="primary-btn">
+            + Add expense
+          </button>
+
+        </form>
+
+        <!-- EXPENSE HISTORY -->
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>Expense history</h2>
+              <p class="muted">Your recorded travel costs.</p>
+            </div>
+          </div>
+
+          <div id="expenses-list"></div>
+
+          <p id="expenses-empty" class="muted">
+            No expenses recorded yet.
+          </p>
+        </section>
+
       </section>
 
       <footer>Made for curious travellers · TripLite</footer>
+
     </main>
   </div>
 
+  <!-- CREATE TRIP DIALOG -->
   <dialog id="trip-dialog" class="trip-dialog">
+
     <form id="trip-form">
+
       <div class="dialog-heading">
-        <div><p class="eyebrow">LET'S GET GOING</p><h2>Create your trip</h2></div>
-        <button type="button" class="close-btn" id="close-dialog" aria-label="Close">×</button>
+        <div>
+          <p class="eyebrow">LET'S GET GOING</p>
+          <h2>Create your trip</h2>
+        </div>
+
+        <button
+          type="button"
+          class="close-btn"
+          id="close-dialog"
+          aria-label="Close"
+        >×</button>
       </div>
-      <label>Trip name<input name="name" required maxlength="70" placeholder="e.g. Summer escape"></label>
-      <label>Destination<input name="destination" required maxlength="80" placeholder="e.g. Manali"></label>
+
+      <label>
+        Trip name
+        <input
+          name="name"
+          required
+          maxlength="70"
+          placeholder="e.g. Summer escape"
+        >
+      </label>
+
+      <label>
+        Destination
+        <input
+          name="destination"
+          required
+          maxlength="80"
+          placeholder="e.g. Manali"
+        >
+      </label>
+
       <div class="form-row">
-        <label>Start date<input name="startDate" type="date" required></label>
-        <label>End date<input name="endDate" type="date" required></label>
+        <label>
+          Start date
+          <input name="startDate" type="date" required>
+        </label>
+
+        <label>
+          End date
+          <input name="endDate" type="date" required>
+        </label>
       </div>
+
       <div class="form-row">
-        <label>Travellers<input name="travellers" type="number" min="1" max="50" value="1" required></label>
-        <label>Budget (₹)<input name="budget" type="number" min="0" value="10000" required></label>
+        <label>
+          Travellers
+          <input
+            name="travellers"
+            type="number"
+            min="1"
+            max="50"
+            value="1"
+            required
+          >
+        </label>
+
+        <label>
+          Budget (₹)
+          <input
+            name="budget"
+            type="number"
+            min="0"
+            step="0.01"
+            value="10000"
+            required
+          >
+        </label>
       </div>
+
       <p id="form-error" class="form-error" role="alert"></p>
-      <button type="submit" class="primary-btn full-width">Save trip</button>
+
+      <button type="submit" class="primary-btn full-width">
+        Save trip
+      </button>
+
     </form>
   </dialog>
 
-  <div id="toast" class="toast" role="status"></div>
+  <!-- NOTIFICATIONS -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 </body>
 </html>
