@@ -3,4 +3,5 @@ node_modules/
 .env.*
 !.env.example
 .DS_Store
+desktop.ini
 npm-debug.log*
