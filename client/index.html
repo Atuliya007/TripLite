@@ -13,7 +13,35 @@
 </head>
 
 <body>
-  <div class="app-shell">
+  <section id="auth-screen" class="auth-screen" aria-labelledby="auth-title" hidden>
+    <div class="auth-card">
+      <p class="eyebrow">YOUR TRAVEL SPACE</p>
+      <h1 id="auth-title">Welcome to TripLite</h1>
+      <p class="muted">Sign in to access your trips and planning data.</p>
+      <div class="auth-switch" aria-label="Account access">
+        <button type="button" class="text-btn active" id="show-login">Sign in</button>
+        <button type="button" class="text-btn" id="show-register">Create account</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit" class="primary-btn full-width">Sign in</button>
+      </form>
+
+      <form id="register-form" class="auth-form" hidden>
+        <label>Name<input name="name" type="text" autocomplete="name" maxlength="80" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="72" aria-describedby="password-help" required></label>
+        <small id="password-help" class="muted">Use at least 12 characters (maximum 72 UTF-8 bytes).</small>
+        <label>Confirm password<input name="passwordConfirmation" type="password" autocomplete="new-password" minlength="12" maxlength="72" required></label>
+        <button type="submit" class="primary-btn full-width">Create account</button>
+      </form>
+      <p id="auth-error" class="form-error" role="alert"></p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="app-shell" hidden>
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
@@ -40,10 +68,10 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <div class="avatar">T</div>
+        <div class="avatar" id="user-avatar">T</div>
         <div>
-          <strong>Traveller</strong>
-          <small>Your travel space</small>
+          <strong id="current-user-name">Traveller</strong>
+          <small id="current-user-email">Your travel space</small>
         </div>
       </div>
     </aside>
@@ -59,9 +87,10 @@
           <p class="muted">Plan less. Explore more.</p>
         </div>
 
-        <button type="button" class="primary-btn" id="add-trip-btn">
-          + Create a trip
-        </button>
+        <div class="topbar-actions">
+          <button type="button" class="primary-btn" id="add-trip-btn">+ Create a trip</button>
+          <button type="button" class="text-btn" id="logout-btn">Sign out</button>
+        </div>
       </header>
 
       <!-- DASHBOARD VIEW -->
@@ -227,6 +256,20 @@
           <!-- Matches app.js: $("#packing-summary") -->
           <span id="packing-summary">0 of 0 packed · 0 remaining</span>
         </div>
+
+        <div class="legacy-import-panel" id="legacy-import-panel" hidden>
+          <div>
+            <strong>Existing browser data found</strong>
+            <p class="muted">Old expenses and checklist items have no recorded owner. Choose a trip below, then explicitly import them to this account.</p>
+          </div>
+          <button type="button" class="text-btn" id="import-legacy-data">Review and import</button>
+        </div>
+
+        <label class="packing-trip-picker" for="packing-trip-select">Checklist for trip
+          <select id="packing-trip-select" required>
+            <option value="">Choose a trip</option>
+          </select>
+        </label>
 
         <form id="packing-form" class="packing-form">
           <input

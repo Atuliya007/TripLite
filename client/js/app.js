@@ -14,10 +14,38 @@ const $$ = (selector, parent = document) =>
   [...parent.querySelectorAll(selector)];
 
 const STORAGE_KEYS = {
-  trips: "triplite-trips",
   packing: "triplite-packing",
   expenses: "triplite-expenses"
 };
+const LEGACY_IMPORT_CLAIM_KEY = "triplite-legacy-import-claimed";
+
+let authStateChannel = null;
+try {
+  if (typeof BroadcastChannel !== "undefined") {
+    authStateChannel = new BroadcastChannel("triplite-auth-state");
+  }
+} catch {
+  // Authentication still works in browsers that restrict BroadcastChannel.
+}
+
+let activeUser = null;
+let csrfToken = "";
+let selectedPackingTripId = "";
+
+function userStorageKey(kind, userId, tripId = "") {
+  const account = encodeURIComponent(userId);
+  return kind === "packing"
+    ? `triplite-user:${account}:packing:${encodeURIComponent(tripId)}`
+    : `triplite-user:${account}:expenses`;
+}
+
+function userImportKey(userId) {
+  return `triplite-user:${encodeURIComponent(userId)}:legacy-imported`;
+}
+
+function userSelectedTripKey(userId) {
+  return `triplite-user:${encodeURIComponent(userId)}:selected-packing-trip`;
+}
 
 function loadData(key) {
   try {
@@ -29,12 +57,22 @@ function loadData(key) {
 }
 
 function saveData(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
+  if (!activeUser) return;
+
+  const scopedKey = key === STORAGE_KEYS.packing
+    ? (selectedPackingTripId
+      ? userStorageKey("packing", activeUser.id, selectedPackingTripId)
+      : null)
+    : key === STORAGE_KEYS.expenses
+      ? userStorageKey("expenses", activeUser.id)
+      : null;
+
+  if (scopedKey) localStorage.setItem(scopedKey, JSON.stringify(data));
 }
 
-let trips = loadData(STORAGE_KEYS.trips);
-let packingItems = loadData(STORAGE_KEYS.packing);
-let expenses = loadData(STORAGE_KEYS.expenses);
+let trips = [];
+let packingItems = [];
+let expenses = [];
 let expenseFilter = "all";
 let toastTimer;
 
@@ -106,12 +144,17 @@ function showToast(message) {
 ========================================== */
 
 async function apiRequest(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers
+  };
+  if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers
-    }
+    credentials: "same-origin",
+    headers
   });
 
   let result;
@@ -123,13 +166,205 @@ async function apiRequest(url, options = {}) {
   }
 
   if (!response.ok || result.success !== true) {
-    throw new Error(
+    if (response.status === 401 && activeUser) {
+      handleSessionExpired(result.message);
+    }
+    const requestError = new Error(
       result.message || `Request failed (${response.status})`
     );
+    requestError.status = response.status;
+    throw requestError;
   }
 
   return result;
 }
+
+const authScreen = $("#auth-screen");
+const appShell = $("#app-shell");
+
+function setAuthMode(mode) {
+  const registering = mode === "register";
+  $("#login-form").hidden = registering;
+  $("#register-form").hidden = !registering;
+  $("#show-login").classList.toggle("active", !registering);
+  $("#show-register").classList.toggle("active", registering);
+  $("#auth-error").textContent = "";
+}
+
+function clearPrivateState({ broadcast = true } = {}) {
+  if (broadcast && activeUser) {
+    authStateChannel?.postMessage({ type: "signed-out" });
+  }
+  trips = [];
+  expenses = [];
+  packingItems = [];
+  selectedPackingTripId = "";
+  expenseFilter = "all";
+  activeUser = null;
+  csrfToken = "";
+  $("#current-user-name").textContent = "Traveller";
+  $("#current-user-email").textContent = "Your travel space";
+  $("#user-avatar").textContent = "T";
+  $("#login-form")?.reset();
+  $("#register-form")?.reset();
+  $("#expense-form")?.reset();
+  $("#packing-form")?.reset();
+  closeTripDialog();
+  renderDashboard();
+  renderAllTrips();
+  renderPacking();
+  renderExpenses();
+  updateExpenseTripOptions();
+  updatePackingTripOptions();
+}
+
+function showAuthScreen(message = "", options = {}) {
+  clearPrivateState(options);
+  appShell.hidden = true;
+  authScreen.hidden = false;
+  setAuthMode("login");
+  $("#auth-error").textContent = message;
+}
+
+authStateChannel?.addEventListener("message", event => {
+  if (!activeUser) return;
+  if (event.data?.type === "signed-out" ||
+      (event.data?.type === "signed-in" && event.data.userId !== activeUser.id)) {
+    showAuthScreen("Your account session changed in another tab. Sign in again.", {
+      broadcast: false
+    });
+    return;
+  }
+  if (event.data?.type === "signed-in") {
+    refreshCsrfToken().catch(() => {
+      showAuthScreen("Your account session changed in another tab. Sign in again.", {
+        broadcast: false
+      });
+    });
+  }
+});
+
+function handleSessionExpired(message = "Your session expired. Please sign in again.") {
+  showAuthScreen(message || "Your session expired. Please sign in again.");
+  refreshCsrfToken().catch(() => {
+    $("#auth-error").textContent = "Your session expired. Refresh the page if sign-in does not work.";
+  });
+}
+
+async function refreshCsrfToken() {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch("/api/auth/csrf", { credentials: "same-origin" });
+    if (response.status === 401) continue;
+    const result = await response.json();
+    if (!response.ok || result.success !== true || !result.csrfToken) {
+      throw new Error(result.message || "Could not initialize secure sign-in.");
+    }
+    csrfToken = result.csrfToken;
+    return csrfToken;
+  }
+  throw new Error("Your session expired. Refresh the page and try again.");
+}
+
+async function enterAuthenticatedApp(user) {
+  activeUser = user;
+  $("#current-user-name").textContent = user.name;
+  $("#current-user-email").textContent = user.email;
+  $("#user-avatar").textContent = user.name.trim().charAt(0).toUpperCase() || "T";
+
+  let tripResult;
+  try {
+    tripResult = await apiRequest("/api/trips");
+  } catch (error) {
+    showAuthScreen(error.message || "Could not load your trips.");
+    throw error;
+  }
+  trips = tripResult.data.map(normalizeTrip);
+  expenses = loadData(userStorageKey("expenses", user.id));
+
+  const rememberedTripId = localStorage.getItem(userSelectedTripKey(user.id));
+  selectedPackingTripId = trips.some(trip => trip.id === rememberedTripId)
+    ? rememberedTripId
+    : (trips[0]?.id || "");
+  if (selectedPackingTripId) {
+    localStorage.setItem(userSelectedTripKey(user.id), selectedPackingTripId);
+  }
+  packingItems = selectedPackingTripId
+    ? loadData(userStorageKey("packing", user.id, selectedPackingTripId))
+    : [];
+
+  authScreen.hidden = true;
+  appShell.hidden = false;
+  updatePackingTripOptions();
+  updateExpenseTripOptions();
+  updateLegacyImportVisibility();
+  renderDashboard();
+  renderAllTrips();
+  renderPacking();
+  renderExpenses();
+  showView("dashboard");
+}
+
+$("#show-login")?.addEventListener("click", () => setAuthMode("login"));
+$("#show-register")?.addEventListener("click", () => setAuthMode("register"));
+
+async function submitAuthForm(form, endpoint) {
+  if (form.dataset.submitting === "true") return;
+  form.dataset.submitting = "true";
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  $("#auth-error").textContent = "";
+  const formData = new FormData(form);
+  const payload = Object.fromEntries(formData.entries());
+
+  try {
+    if (endpoint.endsWith("/register")) {
+      if (payload.password !== payload.passwordConfirmation) {
+        throw new Error("Passwords do not match.");
+      }
+      if (new TextEncoder().encode(payload.password).length > 72) {
+        throw new Error("Password must be no more than 72 UTF-8 bytes.");
+      }
+    }
+    const result = await apiRequest(endpoint, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    csrfToken = result.csrfToken;
+    form.reset();
+    authStateChannel?.postMessage({ type: "signed-in", userId: result.user.id });
+    await enterAuthenticatedApp(result.user);
+  } catch (error) {
+    $("#auth-error").textContent = error.message || "Could not sign in. Please try again.";
+  } finally {
+    form.dataset.submitting = "false";
+    submitButton.disabled = false;
+  }
+}
+
+$("#login-form")?.addEventListener("submit", event => {
+  event.preventDefault();
+  submitAuthForm(event.currentTarget, "/api/auth/login");
+});
+
+$("#register-form")?.addEventListener("submit", event => {
+  event.preventDefault();
+  submitAuthForm(event.currentTarget, "/api/auth/register");
+});
+
+$("#logout-btn")?.addEventListener("click", async () => {
+  const button = $("#logout-btn");
+  button.disabled = true;
+  try {
+    await apiRequest("/api/auth/logout", { method: "POST", body: "{}" });
+    showAuthScreen("You have signed out.");
+    const result = await apiRequest("/api/auth/csrf");
+    csrfToken = result.csrfToken;
+  } catch (error) {
+    if (activeUser) showToast(error.message || "Could not sign out.");
+  } finally {
+    button.disabled = false;
+  }
+});
 
 // Convert MongoDB's _id into the id used by existing UI code.
 function normalizeTrip(trip) {
@@ -440,6 +675,7 @@ tripForm?.addEventListener("submit", async event => {
     } else {
       trips.unshift(savedTrip);
     }
+    updatePackingTripOptions();
     tripForm.reset();
 
     tripForm.elements.namedItem("travellers").value = "1";
@@ -604,6 +840,9 @@ document.addEventListener("click", async event => {
         : expense
     );
 
+    if (selectedPackingTripId === tripId) selectedPackingTripId = "";
+    updatePackingTripOptions();
+
     saveData(STORAGE_KEYS.expenses, expenses);
 
     renderDashboard();
@@ -625,6 +864,132 @@ document.addEventListener("click", async event => {
 
 const packingForm = $("#packing-form");
 const packingList = $("#packing-list");
+const packingTripSelect = $("#packing-trip-select");
+
+function updatePackingTripOptions() {
+  if (!packingTripSelect) return;
+
+  const previousTripId = selectedPackingTripId;
+  if (!trips.some(trip => trip.id === selectedPackingTripId)) {
+    selectedPackingTripId = trips[0]?.id || "";
+  }
+
+  packingTripSelect.innerHTML = `
+    <option value="">${trips.length ? "Choose a trip" : "Create a trip first"}</option>
+    ${trips.map(trip => `
+      <option value="${escapeHTML(trip.id)}">${escapeHTML(trip.name)} — ${escapeHTML(trip.destination)}</option>
+    `).join("")}
+  `;
+  packingTripSelect.value = selectedPackingTripId;
+
+  if (activeUser && selectedPackingTripId) {
+    localStorage.setItem(userSelectedTripKey(activeUser.id), selectedPackingTripId);
+  }
+  if (previousTripId !== selectedPackingTripId) {
+    packingItems = activeUser && selectedPackingTripId
+      ? loadData(userStorageKey("packing", activeUser.id, selectedPackingTripId))
+      : [];
+  }
+
+  const hasTrip = Boolean(activeUser && selectedPackingTripId);
+  $("#packing-item-input").disabled = !hasTrip;
+  $("#packing-form button[type='submit']").disabled = !hasTrip;
+  $("#use-standard-checklist").disabled = !hasTrip;
+  $("#reset-packed-items").disabled = !hasTrip;
+  updateLegacyImportVisibility();
+}
+
+packingTripSelect?.addEventListener("change", () => {
+  if (!activeUser) return;
+  selectedPackingTripId = packingTripSelect.value;
+  localStorage.setItem(userSelectedTripKey(activeUser.id), selectedPackingTripId);
+  packingItems = selectedPackingTripId
+    ? loadData(userStorageKey("packing", activeUser.id, selectedPackingTripId))
+    : [];
+  renderPacking();
+  renderDashboard();
+  updateLegacyImportVisibility();
+});
+
+function updateLegacyImportVisibility() {
+  const panel = $("#legacy-import-panel");
+  if (!panel) return;
+  if (!activeUser) {
+    panel.hidden = true;
+    $("#import-legacy-data").disabled = true;
+    return;
+  }
+  const hasLegacyData = loadData(STORAGE_KEYS.expenses).length > 0 ||
+    loadData(STORAGE_KEYS.packing).length > 0;
+  const previouslyClaimed = Boolean(localStorage.getItem(LEGACY_IMPORT_CLAIM_KEY)) ||
+    Object.keys(localStorage).some(key =>
+      key.startsWith("triplite-user:") && key.endsWith(":legacy-imported")
+    );
+  panel.hidden = !hasLegacyData || previouslyClaimed;
+  $("#import-legacy-data").disabled = !selectedPackingTripId;
+}
+
+$("#import-legacy-data")?.addEventListener("click", () => {
+  if (!activeUser || !selectedPackingTripId) {
+    showToast("Create or select a trip before importing checklist items.");
+    return;
+  }
+
+  const previouslyClaimed = Boolean(localStorage.getItem(LEGACY_IMPORT_CLAIM_KEY)) ||
+    Object.keys(localStorage).some(key =>
+      key.startsWith("triplite-user:") && key.endsWith(":legacy-imported")
+    );
+  if (previouslyClaimed) {
+    updateLegacyImportVisibility();
+    showToast("The old browser data has already been claimed by an account.");
+    return;
+  }
+
+  const legacyExpenses = loadData(STORAGE_KEYS.expenses);
+  const legacyPacking = loadData(STORAGE_KEYS.packing);
+  const trip = trips.find(item => item.id === selectedPackingTripId);
+  const accepted = confirm(
+    `Import ${legacyExpenses.length} existing expense(s) and ${legacyPacking.length} checklist item(s) to ${activeUser.name} (${activeUser.email})? The old browser data has no recorded owner. This browser's legacy data can be claimed only once. Checklist items will be assigned to "${trip?.name || "the selected trip"}". The original data will remain in place.`
+  );
+  if (!accepted) return;
+
+  const knownExpenseIds = new Set(expenses.map(item => String(item.id)));
+  const importedExpenses = legacyExpenses.map(item => {
+    let id = item.id ? String(item.id) : createId();
+    if (knownExpenseIds.has(id)) id = createId();
+    knownExpenseIds.add(id);
+    return {
+      ...item,
+      id,
+      tripId: trips.some(ownedTrip => ownedTrip.id === item.tripId) ? item.tripId : ""
+    };
+  });
+  expenses = [...expenses, ...importedExpenses];
+
+  const knownPackingIds = new Set(packingItems.map(item => String(item.id)));
+  const importedPacking = legacyPacking.map(item => {
+    let id = item.id ? String(item.id) : createId();
+    if (knownPackingIds.has(id)) id = createId();
+    knownPackingIds.add(id);
+    return {
+      ...item,
+      id,
+      name: String(item.name || "").trim(),
+      packed: Boolean(item.packed)
+    };
+  }).filter(item => item.name);
+  packingItems = [...packingItems, ...importedPacking];
+
+  saveData(STORAGE_KEYS.expenses, expenses);
+  saveData(STORAGE_KEYS.packing, packingItems);
+  localStorage.setItem(userImportKey(activeUser.id), new Date().toISOString());
+  localStorage.setItem(LEGACY_IMPORT_CLAIM_KEY, new Date().toISOString());
+  renderExpenses();
+  renderPacking();
+  renderDashboard();
+  updateLegacyImportVisibility();
+  showToast("Existing browser data imported. The original copy was preserved.");
+});
 
 const PACKING_CATEGORIES = [
   {
@@ -691,6 +1056,7 @@ const PACKING_CATEGORIES = [
 const normalizePackingName = name => String(name || "").trim().toLocaleLowerCase();
 
 $("#use-standard-checklist")?.addEventListener("click", () => {
+  if (!activeUser || !selectedPackingTripId) return;
   const existingNames = new Set(packingItems.map(item => normalizePackingName(item.name)));
   let added = 0;
 
@@ -740,6 +1106,7 @@ $("#reset-packed-items")?.addEventListener("click", () => {
 
 packingForm?.addEventListener("submit", event => {
   event.preventDefault();
+  if (!activeUser || !selectedPackingTripId) return;
 
   const input = $("#packing-item-input", packingForm);
   const name = String(input?.value || "").trim();
@@ -790,7 +1157,12 @@ function renderPacking() {
   }
 
   const empty = $("#packing-empty");
-  if (empty) empty.hidden = total > 0;
+  if (empty) {
+    empty.hidden = total > 0;
+    empty.textContent = selectedPackingTripId
+      ? "Your checklist is empty. Add your first item!"
+      : "Create a trip to start a trip-specific packing checklist.";
+  }
 
   const renderItem = item => `
       <li class="packing-item ${item.packed ? "is-packed" : ""}">
@@ -1110,27 +1482,18 @@ function renderDashboard() {
 ========================================== */
 
 async function initializeApp() {
-  // Display saved data while the database request is in progress.
-  renderDashboard();
-  renderAllTrips();
-  renderPacking();
-  renderExpenses();
-  updateExpenseTripOptions();
-  showView("dashboard");
-
   try {
-    const result = await apiRequest("/api/trips");
-
-    trips = result.data.map(normalizeTrip);
-
-    renderDashboard();
-    renderAllTrips();
-    updateExpenseTripOptions();
-
-    console.log("Trips loaded from MongoDB:", trips.length);
+    await refreshCsrfToken();
+    const sessionResult = await apiRequest("/api/auth/me");
+    authStateChannel?.postMessage({ type: "signed-in", userId: sessionResult.user.id });
+    await enterAuthenticatedApp(sessionResult.user);
   } catch (error) {
-    console.error("Could not load MongoDB trips:", error);
-    showToast("Database unavailable. Showing saved local data.");
+    if (error.status === 401) {
+      showAuthScreen();
+    } else {
+      showAuthScreen(error.message || "Could not connect to TripLite. Please try again.");
+    }
+    refreshCsrfToken().catch(() => {});
   }
 }
 

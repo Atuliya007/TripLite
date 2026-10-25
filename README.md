@@ -7,8 +7,10 @@ TripLite is a travel planning dashboard for organizing trips, tracking budgets, 
 - Dashboard with trip count, total trip budget, recorded expenses, and packing progress.
 - Create, view, edit, and delete trips. Trip records are stored in MongoDB.
 - Trip cards show each trip's budget, linked expenses, and remaining budget or over-budget amount.
-- Packing checklist with add, check off, and delete actions. Checklist data is stored in browser localStorage.
+- Per-trip packing checklists with standard essentials, add, check off, and delete actions. Checklist data is stored in account/trip-scoped browser localStorage.
 - Expense tracking with optional trip assignment, all/trip/unassigned filters, expense totals, and delete actions. Expense data is stored in browser localStorage.
+- Account registration and sign-in with MongoDB-backed server sessions and owner-scoped trips.
+- Expenses are stored in account-scoped browser localStorage; packing checklists are scoped to both account and trip.
 - Responsive navigation and layouts for desktop and mobile screens.
 
 ## Tech stack
@@ -17,6 +19,8 @@ TripLite is a travel planning dashboard for organizing trips, tracking budgets, 
 - Node.js and Express
 - MongoDB and Mongoose
 - dotenv for environment variables
+- express-session and connect-mongo for server-side sessions
+- bcryptjs for password hashing and express-rate-limit for authentication throttling
 
 ## Project structure
 
@@ -28,7 +32,10 @@ TripLite/
 │   └── js/app.js
 ├── server/
 │   ├── server.js
-│   └── models/trip.js
+│   ├── models/trip.js
+│   ├── models/user.js
+│   └── tests/auth.test.js
+├── scripts/claim-legacy-trips.js
 ├── .env.example
 ├── .gitignore
 ├── package.json
@@ -41,7 +48,7 @@ Trip API routes and server startup are in `server/server.js`. The Mongoose trip 
 
 ## Prerequisites
 
-- Node.js and npm. The project does not declare a specific minimum Node.js version.
+- Node.js 20.8 or newer and npm.
 - MongoDB running locally, or a MongoDB connection URI that the developer can access.
 - Git to clone the repository.
 
@@ -73,9 +80,17 @@ The example configuration is:
 ```dotenv
 PORT=3000
 MONGODB_URI=mongodb://127.0.0.1:27017/triplite
+SESSION_SECRET=
+TRUST_PROXY_HOPS=0
 ```
 
-Both variables are optional in the current server code: `PORT` defaults to `3000`, and `MONGODB_URI` defaults to the local `triplite` database shown above. Use a private local `.env` value if your MongoDB instance requires authentication or uses another address. Do not place real credentials in `.env.example`.
+`PORT` defaults to `3000`, and `MONGODB_URI` defaults to the local `triplite` database shown above. `SESSION_SECRET` is required and must contain at least 32 bytes. Generate one locally and put it only in `.env`:
+
+```sh
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+`TRUST_PROXY_HOPS` defaults to `0`. Set it to the number of trusted reverse-proxy hops only when deploying behind a proxy that sets forwarded protocol headers. `.env` is ignored by Git. Never use the example file for real secrets.
 
 ## Start MongoDB
 
@@ -105,6 +120,18 @@ http://localhost:3000/api/health
 
 The JSON response reports whether the database connection is `connected` or `disconnected`. In the current implementation, Express starts listening only after the MongoDB connection succeeds, so a failed initial connection exits the server before the health endpoint is available.
 
+## Authentication and sessions
+
+Open the site and create an account with a name, email, and password of at least 12 characters (up to 72 UTF-8 bytes). Email addresses are trimmed and lowercased. Passwords are bcrypt-hashed; account/profile responses never include the hash.
+
+The browser receives a signed session identifier in an `HttpOnly`, `SameSite=Lax` cookie. The identifier is stored server-side in MongoDB's `triplite_sessions` collection. Sessions expire after 30 minutes idle and 12 hours absolute. Login and registration regenerate the session ID. Logout destroys the stored session. Production cookies are `Secure`; production must use HTTPS. If HTTPS terminates at a reverse proxy, configure `TRUST_PROXY_HOPS` carefully.
+
+State-changing requests require a session-bound CSRF token obtained from `GET /api/auth/csrf`; the frontend keeps the token in memory and sends it in `X-CSRF-Token`. The server also checks Origin/Referer hosts when browsers supply those headers. Authentication attempts are rate limited in the current process; deployments with multiple server instances should use a shared rate-limit store.
+
+The authenticated dashboard displays only trips whose owner is the current session user. The server never accepts an owner ID from trip request bodies. Trips that predate accounts have no owner and are hidden from all account queries.
+
+Expenses and packing items remain in localStorage. New expense keys are namespaced by account; packing keys are namespaced by account and trip. This prevents the app UI from loading another account's records after switching users in one browser. localStorage is not encrypted or server-enforced private data: someone with access to the same browser profile or developer tools can inspect it, and it does not sync across devices. Existing unscoped `triplite-expenses` and `triplite-packing` records are not loaded or changed automatically. After sign-in, visit Packing Checklist, choose a trip, and use **Review and import** to explicitly copy the old data into one account. A browser's legacy records can be claimed only once; the app will not offer them to a second account after claiming. Choose the intended account carefully. The original keys remain in place for manual recovery if needed. Old expense links to ownerless trips import as unassigned.
+
 ## API routes
 
 All trip request bodies use JSON. Trip IDs in path parameters are MongoDB document IDs.
@@ -112,12 +139,18 @@ All trip request bodies use JSON. Trip IDs in path parameters are MongoDB docume
 | Method and path | Purpose | Request requirements |
 | --- | --- | --- |
 | `GET /api/health` | Report server and MongoDB connection state. | No body. |
-| `GET /api/trips` | Return trips ordered by creation time, newest first, along with a count. | No body. |
-| `POST /api/trips` | Create a trip; responds with status `201` and the created trip. | JSON object with `name`, `destination`, `startDate`, `endDate`, `travellers`, and `budget`. Names and destination must be non-empty strings. Dates must be real calendar dates formatted `YYYY-MM-DD`, with end date on or after start date. `travellers` must be a whole number from 1 through 50. `budget` must be a finite number greater than or equal to zero. |
-| `PUT /api/trips/:id` | Update an existing trip and return the updated document. The route accepts partial updates. | JSON object containing fields from `name`, `destination`, `startDate`, `endDate`, `travellers`, or `budget`. Supplied values are validated using the create constraints. Date ordering is checked against both updated and existing dates. An empty object currently returns the unchanged trip. |
-| `DELETE /api/trips/:id` | Delete an existing trip and return the deleted document. | No body. The browser client retains any linked expenses in localStorage and unassigns them from the deleted trip. |
+| `GET /api/auth/csrf` | Create or return the current session's CSRF token. | No body. |
+| `POST /api/auth/register` | Register an account and sign it in. | JSON `name`, `email`, `password`, and `passwordConfirmation`. |
+| `POST /api/auth/login` | Sign in and rotate the session ID. | JSON `email` and `password`. |
+| `GET /api/auth/me` | Return the current safe account profile. | Authenticated session required. |
+| `POST /api/auth/logout` | Destroy the current session. | Authenticated session and CSRF token required. |
+| `GET /api/trips` | Return only the current user's trips, newest first, and count. | Authenticated session required. |
+| `GET /api/trips/:id` | Return a trip only when it belongs to the current user. | Authenticated session required. |
+| `POST /api/trips` | Create a trip owned by the current session user. | Authenticated session and CSRF token; JSON `name`, `destination`, `startDate`, `endDate`, `travellers`, and `budget`. |
+| `PUT /api/trips/:id` | Update only a trip owned by the current user. | Authenticated session and CSRF token; partial trip fields. |
+| `DELETE /api/trips/:id` | Delete only a trip owned by the current user. | Authenticated session and CSRF token. |
 
-Validation errors generally return `400`; invalid MongoDB IDs return `400`; missing trips return `404`; unexpected route failures return `500`. API responses use a `success` flag and a message, with trip data returned in `data` on successful trip requests.
+Validation errors generally return `400`; unauthenticated requests return `401`; a missing or another user's trip returns `404`; CSRF/origin failures return `403`; unexpected route failures return generic `500` messages. API responses use a `success` flag and a message, with trip data returned in `data` on successful trip requests.
 
 Example create request body:
 
@@ -134,12 +167,44 @@ Example create request body:
 
 ## Data and current limitations
 
-- MongoDB stores trip documents only. Packing items and expenses remain in localStorage in the browser that created them; they are not synced between browsers or devices and are not included in MongoDB backups.
-- The application has no authentication, user accounts, roles, or multi-user data separation. The API currently exposes trip operations without authentication and is intended for local development.
+- MongoDB stores users, trips, and server sessions. localStorage expenses and packing items are not synced between browsers or devices and are not included in MongoDB backups.
 - Expenses are browser-local records, not a server API or database collection. Trip filters and budget summaries use the local expense records.
-- The popular destination tiles are static dashboard content.
-- There is no automated test script defined in `package.json`.
+- Browser localStorage namespacing is UI isolation, not encryption or server-enforced confidentiality. Do not use it for sensitive financial or medical records.
 - The project does not include a deployment configuration or automated production build step.
+
+## Legacy trip migration
+
+Do not run a migration until you have reviewed and backed up the intended MongoDB database. Ownerless records remain untouched and invisible to normal accounts. To assign all ownerless trips to one existing account, first back up MongoDB, then run a dry run:
+
+```sh
+node scripts/claim-legacy-trips.js --email=account@example.com
+```
+
+Review the count and the chosen account. To apply that exact ownerless-only update, run:
+
+```sh
+node scripts/claim-legacy-trips.js --email=account@example.com --apply
+```
+
+The script refuses accounts that do not already exist, updates only records with no owner, and leaves owned records unchanged, so rerunning it does not transfer claimed trips. This is an owner-controlled action and should not be run as part of signup. Example backup command (run against the same URI configured in `.env`):
+
+```sh
+mongodump --uri="$MONGODB_URI" --archive=triplite-before-auth.archive.gz --gzip
+```
+
+On PowerShell, use `$env:MONGODB_URI` in place of the shell variable. No migration was run as part of this change.
+
+## Tests
+
+Run syntax checks and the test runner with:
+
+```sh
+node --check server/server.js
+node --check client/js/app.js
+npm test
+```
+
+The authentication integration tests require `MONGODB_TEST_URI`. Set it to a dedicated disposable MongoDB database whose name contains `test`; the runner creates a unique suffixed database and drops only that database afterward. Do not point it at the normal application database. Without that variable the integration suite is reported as skipped.
 
 ## Troubleshooting
 

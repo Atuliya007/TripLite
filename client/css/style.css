@@ -141,6 +141,55 @@ select:focus-visible {
     font-weight: 800;
 }
 
+.auth-screen {
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    padding: 24px;
+    background: var(--bg);
+}
+
+.auth-card {
+    width: min(440px, 100%);
+    padding: 34px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.auth-card h1 { margin: 6px 0; font: 800 28px Manrope, sans-serif; }
+.auth-card > .muted { margin-bottom: 20px; }
+.auth-switch { display: flex; gap: 18px; margin: 18px 0; border-bottom: 1px solid var(--border); }
+.auth-switch button { padding: 0 0 10px; }
+.auth-switch button.active { color: var(--primary); border-bottom: 2px solid var(--accent); }
+.auth-form { display: grid; gap: 13px; }
+.auth-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
+.auth-form input { width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; background: #fffefa; }
+.auth-form input:focus-visible { outline: 3px solid rgba(185, 149, 91, 0.4); border-color: var(--accent); }
+.auth-form small { margin-top: -10px; }
+.auth-card .form-error { min-height: 18px; margin-top: 12px; }
+.topbar-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.sidebar-bottom > div:last-child { min-width: 0; }
+#current-user-name, #current-user-email { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+
+.legacy-import-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.legacy-import-panel p { margin-top: 4px; font-size: 12px; }
+.packing-trip-picker { display: grid; gap: 6px; max-width: 420px; margin: 16px 0; font-size: 12px; font-weight: 700; }
+.packing-trip-picker select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+
 .sidebar-bottom strong,
 .sidebar-bottom small {
     display: block;
